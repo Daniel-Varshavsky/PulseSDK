@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --bg-base: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --border: #E2E8F0;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  --accent: #0D9488;
+  --accent-hover: #0F766E;
+  --accent-subtle: #F0FDFA;
+  --accent-text: #0F766E;
+  --accent-border: #99F6E4;
+  --accent-text-on: #FFFFFF;
+  --chart-bar-a: #0D9488;
+  --chart-bar-b: #94A3B8;
+  --chart-grid: #80848A;
+  --chart-axis: #6B7280;
+  --chart-negative: #FCA5A5;
+  --chart-positive-b: #64748B;
+  --status-active-bg: #CCFBF1;
+  --status-active-text: #0F766E;
+  --status-paused-bg: #FEF9C3;
+  --status-paused-text: #854D0E;
+  --status-completed-bg: #F1F5F9;
+  --status-completed-text: #475569;
+}
+
+/* Semantic utility classes */
+.bg-base { background-color: var(--bg-base); }
+.bg-surface { background-color: var(--bg-surface); }
+.bg-subtle { background-color: var(--bg-subtle); }
+.border-theme { border-color: var(--border); }
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+.bg-accent { background-color: var(--accent); }
+.bg-accent-subtle { background-color: var(--accent-subtle); }
+.text-accent { color: var(--accent); }
+.text-accent-text { color: var(--accent-text); }
+.border-accent { border-color: var(--accent); }
+.border-accent-border { border-color: var(--accent-border); }
+.hover-accent:hover { background-color: var(--accent-hover); }
+.status-active { background-color: var(--status-active-bg); color: var(--status-active-text); }
+.status-paused { background-color: var(--status-paused-bg); color: var(--status-paused-text); }
+.status-completed { background-color: var(--status-completed-bg); color: var(--status-completed-text); }
+
+/* Input focus ring using accent */
+.focus-accent:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Scrollbar theming for dark modes */
+* {
+  scrollbar-color: var(--bg-subtle) var(--bg-base);
+}

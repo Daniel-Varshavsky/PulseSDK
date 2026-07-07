@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  googleId     String?  @unique
+  createdAt    DateTime @default(now())
+
+  appMemberships AppMember[]
+  experiments    Experiment[]
+}
+
+model App {
+  id        String   @id @default(uuid())
+  name      String
+  apiKey    String   @unique @default(uuid())
+  createdAt DateTime @default(now())
+
+  members         AppMember[]
+  experiments     Experiment[]
+  users           User[]
+}
+
+model AppMember {
+  id        String          @id @default(uuid())
+  accountId String
+  appId     String
+  role      AppMemberRole   @default(COLLABORATOR)
+  status    AppMemberStatus @default(ACTIVE)
+  joinedAt  DateTime        @default(now())
+  leftAt    DateTime?
+
+  account Account @relation(fields: [accountId], references: [id])
+  app     App     @relation(fields: [appId], references: [id])
+
+  @@unique([accountId, appId])
+}
+
+model Experiment {
+  id            String           @id @default(uuid())
+  appId         String
+  createdById   String
+  name          String
+  status        ExperimentStatus @default(ACTIVE)
+  trafficSplit  Json
+  targetVersion String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  app       App       @relation(fields: [appId], references: [id])
+  createdBy Account   @relation(fields: [createdById], references: [id])
+  variants  Variant[]
+  results   ExperimentResult[]
+}
+
+model Variant {
+  id           String  @id @default(uuid())
+  experimentId String
+  name         String
+  weight       Int
+  choices      Json?
+
+  experiment        Experiment         @relation(fields: [experimentId], references: [id])
+  feedbackResponses FeedbackResponse[]
+  results           ExperimentResult[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  appId          String
+  externalUserId String?
+  createdAt      DateTime @default(now())
+
+  app               App                @relation(fields: [appId], references: [id])
+  deviceTokens      DeviceToken[]
+  feedbackResponses FeedbackResponse[]
+
+  @@unique([appId, externalUserId])
+}
+
+model DeviceToken {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  fcmToken   String   @unique
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model FeedbackResponse {
+  id         String       @id @default(uuid())
+  userId     String
+  variantId  String?
+  type       FeedbackType
+  value      Json
+  comment    String?
+  screenId   String?
+  appVersion String?
+  createdAt  DateTime     @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  variant Variant? @relation(fields: [variantId], references: [id])
+}
+
+model ExperimentResult {
+  id            String   @id @default(uuid())
+  experimentId  String
+  variantId     String
+  responseCount Int      @default(0)
+  avgRating     Float?
+  computedAt    DateTime @default(now())
+
+  experiment Experiment @relation(fields: [experimentId], references: [id])
+  variant    Variant    @relation(fields: [variantId], references: [id])
+
+  @@unique([experimentId, variantId])
+}
+
+enum ExperimentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum FeedbackType {
+  STAR_RATING
+  THUMBS
+  TEXT
+  MULTIPLE_CHOICE
+}
+
+enum AppMemberRole {
+  OWNER
+  COLLABORATOR
+}
+
+enum AppMemberStatus {
+  ACTIVE
+  REMOVED
+}
