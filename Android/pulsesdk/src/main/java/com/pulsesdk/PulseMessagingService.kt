@@ -1,5 +1,13 @@
 package com.pulsesdk
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -15,11 +23,53 @@ class PulseMessagingService : FirebaseMessagingService() {
     }
 
     /**
-     * Called when a push notification is received while the app is in the foreground.
-     * Developers can override this in their own MessagingService if they need
-     * custom handling — for now we just let the system handle it.
+     * FCM only auto-displays notification-type messages when the app is backgrounded
+     * or killed — while the app is in the foreground they're delivered here instead,
+     * so we have to build and show them ourselves or they're silently dropped.
      */
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        val notification = message.notification ?: return
+        showNotification(notification.title, notification.body)
+    }
+
+    private fun showNotification(title: String?, body: String?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Notifications", NotificationManager.IMPORTANCE_DEFAULT)
+            )
+        }
+
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = launchIntent?.let {
+            PendingIntent.getActivity(
+                this,
+                0,
+                it,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setSmallIcon(applicationInfo.icon)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        manager.notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    private companion object {
+        const val CHANNEL_ID = "pulsesdk_notifications"
     }
 }
