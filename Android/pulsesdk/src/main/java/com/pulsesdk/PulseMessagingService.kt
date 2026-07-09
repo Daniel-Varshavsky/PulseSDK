@@ -36,7 +36,7 @@ class PulseMessagingService : FirebaseMessagingService() {
     private fun showNotification(title: String?, body: String?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
+                != PackageManager.PERMISSION_GRANTED
         ) {
             return
         }
@@ -49,6 +49,7 @@ class PulseMessagingService : FirebaseMessagingService() {
         }
 
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            ?.putExtra(EXTRA_FROM_NOTIFICATION, true)
         val pendingIntent = launchIntent?.let {
             PendingIntent.getActivity(
                 this,
@@ -69,7 +70,15 @@ class PulseMessagingService : FirebaseMessagingService() {
         manager.notify(System.currentTimeMillis().toInt(), notification)
     }
 
-    private companion object {
-        const val CHANNEL_ID = "pulsesdk_notifications"
+    companion object {
+        /**
+         * Set to true on the launch Intent when the app is opened by tapping a
+         * PulseSDK push notification. Check this in your launcher Activity's
+         * intent (e.g. `intent.getBooleanExtra(PulseMessagingService.EXTRA_FROM_NOTIFICATION, false)`)
+         * to route the user somewhere specific.
+         */
+        const val EXTRA_FROM_NOTIFICATION = "com.pulsesdk.FROM_NOTIFICATION"
+
+        private const val CHANNEL_ID = "pulsesdk_notifications"
     }
 }

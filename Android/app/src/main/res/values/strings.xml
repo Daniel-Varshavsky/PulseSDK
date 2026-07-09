@@ -1,3 +1,28 @@
 <resources>
     <string name="app_name">PulseSDK</string>
+
+    <string name="login_title">Welcome</string>
+    <string name="login_subtitle">Enter a user ID to identify yourself to PulseSDK</string>
+    <string name="login_user_id_hint">User ID</string>
+    <string name="login_continue">Continue</string>
+    <string name="login_error_blank">Enter a user ID to continue</string>
+
+    <string name="main_experiment_title">Homepage CTA</string>
+    <string name="main_experiment_none">No active experiment named \"%1$s\" yet — create one with this exact name in the Portal to see this card change per variant.</string>
+    <string name="main_variant_label">Variant: %1$s</string>
+    <string name="main_experiment_active">You\'re seeing the \"%1$s\" experience for \"%2$s\".</string>
+    <string name="main_rate_prompt">We\'d love your feedback on this</string>
+    <string name="main_submit_rating">Submit Feedback</string>
+    <string name="main_rating_thanks">Thanks for your feedback!</string>
+    <string name="main_send_feedback">Send General Feedback</string>
+    <string name="main_logout">Log out</string>
+    <string name="main_cta_default">Learn More</string>
+    <string name="main_cta_variant_b">Get Started Now</string>
+
+    <string name="feedback_title">Feedback</string>
+    <string name="feedback_from_notification">You got here by tapping a push notification.</string>
+    <string name="feedback_hint">What\'s on your mind?</string>
+    <string name="feedback_submit">Submit</string>
+    <string name="feedback_thanks">Thanks for your feedback!</string>
+    <string name="feedback_error_blank">Write something before submitting</string>
 </resources>

@@ -1,7 +1,9 @@
 import prisma from '../lib/prisma.js'
 
+const VALID_FEEDBACK_TYPES = ['STAR_RATING', 'THUMBS', 'TEXT', 'MULTIPLE_CHOICE']
+
 export async function createExperiment(req, res) {
-  const { appId, name, trafficSplit, targetVersion } = req.body
+  const { appId, name, trafficSplit, targetVersion, feedbackType = 'STAR_RATING' } = req.body
 
   if (!appId || !name || !trafficSplit) {
     return res.status(400).json({ error: 'appId, name, and trafficSplit are required' })
@@ -9,6 +11,10 @@ export async function createExperiment(req, res) {
 
   if (!Array.isArray(trafficSplit) || trafficSplit.reduce((sum, v) => sum + v.weight, 0) !== 100) {
     return res.status(400).json({ error: 'trafficSplit must be an array of variants whose weights sum to 100' })
+  }
+
+  if (!VALID_FEEDBACK_TYPES.includes(feedbackType)) {
+    return res.status(400).json({ error: `feedbackType must be one of: ${VALID_FEEDBACK_TYPES.join(', ')}` })
   }
 
   try {
@@ -22,6 +28,7 @@ export async function createExperiment(req, res) {
         appId,
         createdById: req.account.id,
         name,
+        feedbackType,
         trafficSplit,
         targetVersion,
         variants: {
@@ -29,6 +36,7 @@ export async function createExperiment(req, res) {
             name: v.name,
             weight: v.weight,
             choices: v.choices ?? null,
+            metadata: v.metadata ?? null,
           })),
         },
       },

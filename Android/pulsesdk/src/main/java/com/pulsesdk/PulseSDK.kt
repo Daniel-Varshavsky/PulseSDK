@@ -192,6 +192,8 @@ object PulseSDK {
                     variantId = assignedVariant.id,
                     variantName = assignedVariant.name,
                     choices = assignedVariant.choices,
+                    feedbackType = experiment.feedbackType,
+                    metadata = assignedVariant.metadata,
                 )
 
                 // Cache the assignment

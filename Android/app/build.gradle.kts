@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.pulsesdk"
+    namespace = "com.pulsesdk.demo"
     compileSdk {
         version = release(36)
     }

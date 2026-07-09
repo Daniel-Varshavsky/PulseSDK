@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, FlaskConical } from 'lucide-react'
 import api from '../lib/api'
+import { themes } from '../lib/themes'
 
 const statusStyle = {
   ACTIVE: { background: 'var(--status-active-bg)', color: 'var(--status-active-text)' },
@@ -15,11 +16,40 @@ const inputStyle = {
   color: 'var(--text-primary)',
 }
 
+const feedbackTypeOptions = [
+  { value: 'STAR_RATING', label: 'Star Rating' },
+  { value: 'THUMBS', label: 'Thumbs Up/Down' },
+  { value: 'TEXT', label: 'Open Text' },
+  { value: 'MULTIPLE_CHOICE', label: 'Multiple Choice' },
+]
+
+const lightThemeEntries = Object.entries(themes).filter(([, t]) => t.mode === 'light')
+const darkThemeEntries = Object.entries(themes).filter(([, t]) => t.mode === 'dark')
+
+// The subset of a Portal theme's colors the Android/mobile SDK actually uses.
+function resolveThemeColors(themeKey) {
+  if (!themeKey) return null
+  const theme = themes[themeKey]
+  if (!theme) return null
+  return {
+    themeName: theme.name,
+    bgBase: theme.vars['--bg-base'],
+    bgSurface: theme.vars['--bg-surface'],
+    textPrimary: theme.vars['--text-primary'],
+    textSecondary: theme.vars['--text-secondary'],
+    accent: theme.vars['--accent'],
+    accentTextOn: theme.vars['--accent-text-on'],
+    border: theme.vars['--border'],
+  }
+}
+
 function CreateExperimentModal({ onClose, onCreate }) {
   const [name, setName] = useState('')
+  const [feedbackType, setFeedbackType] = useState('STAR_RATING')
+  const [choices, setChoices] = useState(['Option 1', 'Option 2'])
   const [variants, setVariants] = useState([
-    { name: 'Variant A', weight: 50 },
-    { name: 'Variant B', weight: 50 },
+    { name: 'Variant A', weight: 50, theme: 'light' },
+    { name: 'Variant B', weight: 50, theme: 'blue-dark' },
   ])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -29,7 +59,7 @@ function CreateExperimentModal({ onClose, onCreate }) {
   }
 
   function addVariant() {
-    setVariants(prev => [...prev, { name: `Variant ${String.fromCharCode(65 + prev.length)}`, weight: 0 }])
+    setVariants(prev => [...prev, { name: `Variant ${String.fromCharCode(65 + prev.length)}`, weight: 0, theme: '' }])
   }
 
   function removeVariant(index) {
@@ -37,19 +67,42 @@ function CreateExperimentModal({ onClose, onCreate }) {
     setVariants(prev => prev.filter((_, i) => i !== index))
   }
 
+  function updateChoice(index, value) {
+    setChoices(prev => prev.map((c, i) => i === index ? value : c))
+  }
+
+  function addChoice() {
+    setChoices(prev => [...prev, `Option ${prev.length + 1}`])
+  }
+
+  function removeChoice(index) {
+    if (choices.length <= 2) return
+    setChoices(prev => prev.filter((_, i) => i !== index))
+  }
+
   const totalWeight = variants.reduce((sum, v) => sum + Number(v.weight), 0)
+  const isMultipleChoice = feedbackType === 'MULTIPLE_CHOICE'
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
     if (totalWeight !== 100) { setError('Variant weights must sum to 100'); return }
+    if (isMultipleChoice && choices.some(c => !c.trim())) { setError('Choice options cannot be blank'); return }
     setLoading(true)
     try {
       const activeApp = JSON.parse(localStorage.getItem('pulsesdk_active_app'))
       const res = await api.post('/experiments', {
         appId: activeApp.id,
         name,
-        trafficSplit: variants.map(v => ({ name: v.name, weight: Number(v.weight) })),
+        feedbackType,
+        trafficSplit: variants.map(v => ({
+          name: v.name,
+          weight: Number(v.weight),
+          ...(isMultipleChoice && { choices }),
+          // "theme" is a Portal-only concept — the SDK just gets an opaque
+          // metadata bag it doesn't interpret, resolved to colors here.
+          metadata: resolveThemeColors(v.theme),
+        })),
       })
       onCreate(res.data)
       onClose()
@@ -63,7 +116,7 @@ function CreateExperimentModal({ onClose, onCreate }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50"
       style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-2xl shadow-xl w-full max-w-md p-6"
+      <div className="rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
         <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>New Experiment</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -76,6 +129,46 @@ function CreateExperimentModal({ onClose, onCreate }) {
               onBlur={e => e.target.style.boxShadow = 'none'}
               placeholder="e.g. Homepage Banner Test" required />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Feedback Type</label>
+            <select value={feedbackType} onChange={e => setFeedbackType(e.target.value)}
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}>
+              {feedbackTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+              How the app collects feedback for this experiment.
+            </p>
+          </div>
+
+          {isMultipleChoice && (
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Choice Options</label>
+              <div className="space-y-2">
+                {choices.map((c, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input value={c} onChange={e => updateChoice(i, e.target.value)}
+                      className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}
+                      onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                      onBlur={e => e.target.style.boxShadow = 'none'}
+                      placeholder={`Option ${i + 1}`} required />
+                    <button type="button" onClick={() => removeChoice(i)}
+                      className="text-lg leading-none disabled:opacity-30"
+                      style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                      disabled={choices.length <= 2}>×</button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={addChoice}
+                className="mt-2 text-sm font-medium"
+                style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                + Add option
+              </button>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Variants</label>
@@ -99,6 +192,16 @@ function CreateExperimentModal({ onClose, onCreate }) {
                     onBlur={e => e.target.style.boxShadow = 'none'}
                     min={0} max={100} required />
                   <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>%</span>
+                  <select value={v.theme} onChange={e => updateVariant(i, 'theme', e.target.value)}
+                    className="w-36 rounded-lg px-2 py-2 text-sm focus:outline-none" style={inputStyle}>
+                    <option value="">No theme</option>
+                    <optgroup label="Light">
+                      {lightThemeEntries.map(([key, t]) => <option key={key} value={key}>{t.name}</option>)}
+                    </optgroup>
+                    <optgroup label="Dark">
+                      {darkThemeEntries.map(([key, t]) => <option key={key} value={key}>{t.name}</option>)}
+                    </optgroup>
+                  </select>
                   <button type="button" onClick={() => removeVariant(i)}
                     className="text-lg leading-none disabled:opacity-30"
                     style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -108,6 +211,9 @@ function CreateExperimentModal({ onClose, onCreate }) {
                 </div>
               ))}
             </div>
+            <p className="text-sm mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              Each variant's theme is pushed straight to the app — no update required.
+            </p>
             <button type="button" onClick={addVariant}
               className="mt-2 text-sm font-medium"
               style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>

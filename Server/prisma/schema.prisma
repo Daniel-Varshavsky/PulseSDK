@@ -50,6 +50,7 @@ model Experiment {
   createdById   String
   name          String
   status        ExperimentStatus @default(ACTIVE)
+  feedbackType  FeedbackType     @default(STAR_RATING)
   trafficSplit  Json
   targetVersion String?
   createdAt     DateTime         @default(now())
@@ -67,6 +68,7 @@ model Variant {
   name         String
   weight       Int
   choices      Json?
+  metadata     Json?
 
   experiment        Experiment         @relation(fields: [experimentId], references: [id])
   feedbackResponses FeedbackResponse[]

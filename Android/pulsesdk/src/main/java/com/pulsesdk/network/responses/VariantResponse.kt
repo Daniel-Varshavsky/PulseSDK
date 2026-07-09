@@ -5,4 +5,5 @@ internal data class VariantResponse(
     val name: String,
     val weight: Int,
     val choices: List<String>?,
+    val metadata: Map<String, String>?,
 )
