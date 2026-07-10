@@ -38,6 +38,9 @@ class FeedbackActivity : AppCompatActivity() {
             }
             feedbackLayout.error = null
 
+            // Not tied to any experiment variant — this screen is always
+            // app-wide feedback, regardless of which experiment card the
+            // user was looking at on the main screen.
             PulseSDK.submitText(text = text, screenId = "feedback-screen")
             Toast.makeText(this, R.string.feedback_thanks, Toast.LENGTH_SHORT).show()
             feedbackInput.setText("")

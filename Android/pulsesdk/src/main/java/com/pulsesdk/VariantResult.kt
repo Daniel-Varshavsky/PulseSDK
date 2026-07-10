@@ -2,6 +2,7 @@ package com.pulsesdk
 
 data class VariantResult(
     val experimentId: String,
+    val experimentName: String,
     val variantId: String,
     val variantName: String,
     val choices: List<String>?,

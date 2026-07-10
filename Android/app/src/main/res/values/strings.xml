@@ -7,15 +7,26 @@
     <string name="login_continue">Continue</string>
     <string name="login_error_blank">Enter a user ID to continue</string>
 
-    <string name="main_experiment_title">Homepage CTA</string>
-    <string name="main_experiment_none">No active experiment named \"%1$s\" yet — create one with this exact name in the Portal to see this card change per variant.</string>
+    <string name="main_loading_title">Loading…</string>
+    <string name="main_loading_message">Checking for active experiments.</string>
+    <string name="main_general_card_title">General</string>
+    <string name="main_general_card_message">That\'s every active experiment right now. Have thoughts about the app overall? Use \"Send General Feedback\" below anytime.</string>
+    <string name="main_general_card_instructions">Want to see another card here? In the Portal: create an experiment, add at least two variants and a feedback type, then set its status to Active. It\'ll show up here the next time the app checks — no changes to this app required.</string>
     <string name="main_variant_label">Variant: %1$s</string>
     <string name="main_experiment_active">You\'re seeing the \"%1$s\" experience for \"%2$s\".</string>
     <string name="main_rate_prompt">We\'d love your feedback on this</string>
+    <string name="main_prev_experiment">‹</string>
+    <string name="main_next_experiment">›</string>
+    <string name="main_experiment_page">Card %1$d of %2$d</string>
+    <string name="main_comment_hint">Additional comments (optional)</string>
     <string name="main_submit_rating">Submit Feedback</string>
     <string name="main_rating_thanks">Thanks for your feedback!</string>
     <string name="main_send_feedback">Send General Feedback</string>
     <string name="main_logout">Log out</string>
+    <string name="main_switch_variant">Switch Variant</string>
+    <string name="main_switch_variant_title">Preview a variant</string>
+    <string name="main_switch_variant_reset">Reset to my assigned variant</string>
+    <string name="main_switch_variant_none">No active experiment to switch variants on</string>
     <string name="main_cta_default">Learn More</string>
     <string name="main_cta_variant_b">Get Started Now</string>
 

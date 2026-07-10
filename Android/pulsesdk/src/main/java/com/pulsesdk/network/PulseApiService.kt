@@ -6,8 +6,11 @@ import retrofit2.http.*
 
 internal interface PulseApiService {
 
+    // The SDK only ever acts on running experiments, so scope the request
+    // server-side instead of shipping paused/draft/completed experiments
+    // to the device just to filter them out locally.
     @GET("experiments")
-    suspend fun getExperiments(): List<ExperimentResponse>
+    suspend fun getExperiments(@Query("status") status: String = "ACTIVE"): List<ExperimentResponse>
 
     @POST("feedback")
     suspend fun submitFeedback(@Body body: FeedbackRequest): FeedbackResponse

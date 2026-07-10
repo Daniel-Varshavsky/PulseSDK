@@ -1,6 +1,8 @@
 import prisma from '../lib/prisma.js'
 
-const VALID_FEEDBACK_TYPES = ['STAR_RATING', 'THUMBS', 'TEXT', 'MULTIPLE_CHOICE']
+// TEXT isn't offered here — standalone submitText() (general feedback) already
+// covers free-text responses, tied to a variant when one is active.
+const VALID_FEEDBACK_TYPES = ['STAR_RATING', 'THUMBS', 'MULTIPLE_CHOICE']
 
 export async function createExperiment(req, res) {
   const { appId, name, trafficSplit, targetVersion, feedbackType = 'STAR_RATING' } = req.body
