@@ -250,10 +250,6 @@ export default function ExperimentDetail() {
   const [feedbackSort, setFeedbackSort] = useState({ key: 'createdAt', direction: 'desc' })
   const [variantSort, setVariantSort] = useState({ key: null, direction: 'asc' })
   const [showComments, setShowComments] = useState(true)
-  const [textSearch, setTextSearch] = useState('')
-  const [textVariantFilter, setTextVariantFilter] = useState('')
-  const [textSort, setTextSort] = useState({ key: 'createdAt', direction: 'desc' })
-  const [textFeedbackRaw, setTextFeedbackRaw] = useState([])
 
   useEffect(() => {
     async function load() {
@@ -267,22 +263,6 @@ export default function ExperimentDetail() {
     const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
   }, [id])
-
-  // Fetch text feedback separately with its own server-side variant filter
-  useEffect(() => {
-    async function loadText() {
-      try {
-        const params = new URLSearchParams()
-        params.set('experimentId', id)
-        params.set('type', 'TEXT')
-        params.set('limit', '100')
-        if (textVariantFilter) params.set('variantId', textVariantFilter)
-        const res = await api.get(`/feedback?${params.toString()}`)
-        setTextFeedbackRaw(res.data.responses)
-      } catch (err) { console.error(err) }
-    }
-    if (!loading) loadText()
-  }, [id, textVariantFilter, loading])
 
   // Fetch structured feedback — refetch when variant filter changes
   useEffect(() => {
@@ -365,17 +345,6 @@ export default function ExperimentDetail() {
       : feedbackSort.key === 'variant' ? { key: 'variantLabel', direction: feedbackSort.direction }
       : feedbackSort.key === 'value' ? { key: 'valueRaw', direction: feedbackSort.direction }
       : feedbackSort
-  )
-
-  const textFeedback = useSortedData(
-    feedback.filter(f => f.type === 'TEXT').filter(f => {
-      const sl = textSearch.toLowerCase()
-      return (!textSearch || (f.user?.externalUserId ?? '').toLowerCase().includes(sl) || (f.screenId ?? '').toLowerCase().includes(sl) || (typeof f.value === 'string' ? f.value : '').toLowerCase().includes(sl))
-        && (!textVariantFilter || f.variantId === textVariantFilter)
-    }).map(f => ({ ...f, userLabel: f.user?.externalUserId ?? '', valueStr: typeof f.value === 'string' ? f.value : JSON.stringify(f.value) })),
-    textSort.key === 'user' ? { key: 'userLabel', direction: textSort.direction }
-      : textSort.key === 'value' ? { key: 'valueStr', direction: textSort.direction }
-      : textSort
   )
 
   if (loading) return <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-tertiary)' }}>Loading...</div>
@@ -503,52 +472,6 @@ export default function ExperimentDetail() {
           </div>
         )}
       </div>
-
-      {/* Text feedback */}
-      {textFeedback.length > 0 && (
-        <div className="rounded-xl" style={cardStyle}>
-          <div className="px-6 py-4 flex flex-wrap items-center gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>General Text Feedback</h3>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Suggestions, ideas, and other open-ended responses</p>
-            </div>
-            <input value={textSearch} onChange={e => setTextSearch(e.target.value)}
-              placeholder="Search by user or content..."
-              className="rounded-lg px-3 py-1.5 text-sm focus:outline-none w-56" style={inputStyle}
-              onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
-              onBlur={e => e.target.style.boxShadow = 'none'} />
-            <select value={textVariantFilter} onChange={e => setTextVariantFilter(e.target.value)}
-              className="rounded-lg px-3 py-1.5 text-sm focus:outline-none" style={selectStyle}>
-              <option value="">All variants</option>
-              {experiment.variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-            <select value={textSort.key + '_' + textSort.direction}
-              onChange={e => { const [key, direction] = e.target.value.split('_'); setTextSort({ key, direction }) }}
-              className="rounded-lg px-3 py-1.5 text-sm focus:outline-none" style={selectStyle}>
-              <option value="createdAt_desc">Newest first</option>
-              <option value="createdAt_asc">Oldest first</option>
-              <option value="user_asc">User A–Z</option>
-              <option value="user_desc">User Z–A</option>
-            </select>
-          </div>
-          <div className="p-6 space-y-4">
-            {textFeedback.map(f => (
-              <div key={f.id} className="rounded-xl p-5" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                  {typeof f.value === 'string' ? f.value : JSON.stringify(f.value)}
-                </p>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{f.user?.externalUserId ?? 'Anonymous'}</span>
-                  {f.variant && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.variant.name}</span>}
-                  {f.screenId && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.screenId}</span>}
-                  {f.appVersion && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>v{f.appVersion}</span>}
-                  <span className="text-sm ml-auto" style={{ color: 'var(--text-tertiary)' }}>{new Date(f.createdAt).toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

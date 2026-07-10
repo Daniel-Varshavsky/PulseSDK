@@ -136,15 +136,17 @@ export default function Dashboard() {
   const activeExperiments = experiments.filter(e => e.status === 'ACTIVE').slice(0, 5)
   const tableExperiments = experiments.slice(0, 5)
 
-  // Build chart data from server-computed aggregates
-  const starChartData = activeExperiments.flatMap(exp =>
-    (exp.aggregates ?? [])
-      .filter(a => a.starRating.avgRating != null)
-      .map(a => ({
-        name: `${exp.name} — ${a.variantName}`,
-        avgRating: parseFloat(a.starRating.avgRating.toFixed(2)),
-      }))
-  )
+  // Build chart data from server-computed aggregates. For experiments with
+  // any star rating data, show every variant (defaulting to 0 for ones with
+  // no ratings yet) — matches ExperimentDetail's chart, which does the same.
+  const starChartData = activeExperiments.flatMap(exp => {
+    const aggs = exp.aggregates ?? []
+    if (!aggs.some(a => a.starRating.count > 0)) return []
+    return aggs.map(a => ({
+      name: `${exp.name} — ${a.variantName}`,
+      avgRating: a.starRating.avgRating != null ? parseFloat(a.starRating.avgRating.toFixed(2)) : 0,
+    }))
+  })
 
   const thumbsChartData = activeExperiments.flatMap(exp =>
     (exp.aggregates ?? [])

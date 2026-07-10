@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FlaskConical } from 'lucide-react'
+import { Plus, FlaskConical, Code } from 'lucide-react'
 import api from '../lib/api'
 
 const statusStyle = {
@@ -15,11 +15,20 @@ const inputStyle = {
   color: 'var(--text-primary)',
 }
 
+// TEXT isn't offered — general feedback in the app already covers free-text
+// responses, tied to a variant when one is active.
+const feedbackTypeOptions = [
+  { value: 'STAR_RATING', label: 'Star Rating' },
+  { value: 'THUMBS', label: 'Thumbs Up/Down' },
+  { value: 'MULTIPLE_CHOICE', label: 'Multiple Choice' },
+]
+
 function CreateExperimentModal({ onClose, onCreate }) {
   const [name, setName] = useState('')
+  const [feedbackType, setFeedbackType] = useState('STAR_RATING')
   const [variants, setVariants] = useState([
-    { name: 'Variant A', weight: 50 },
-    { name: 'Variant B', weight: 50 },
+    { name: 'Variant A', weight: 50, choices: ['Option 1', 'Option 2'], metadataMode: 'fields', metadataFields: [{ key: '', value: '' }], metadataJson: '', metadataError: null },
+    { name: 'Variant B', weight: 50, choices: ['Option 1', 'Option 2'], metadataMode: 'fields', metadataFields: [{ key: '', value: '' }], metadataJson: '', metadataError: null },
   ])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -29,7 +38,15 @@ function CreateExperimentModal({ onClose, onCreate }) {
   }
 
   function addVariant() {
-    setVariants(prev => [...prev, { name: `Variant ${String.fromCharCode(65 + prev.length)}`, weight: 0 }])
+    setVariants(prev => [...prev, {
+      name: `Variant ${String.fromCharCode(65 + prev.length)}`,
+      weight: 0,
+      choices: ['Option 1', 'Option 2'],
+      metadataMode: 'fields',
+      metadataFields: [{ key: '', value: '' }],
+      metadataJson: '',
+      metadataError: null,
+    }])
   }
 
   function removeVariant(index) {
@@ -37,24 +54,141 @@ function CreateExperimentModal({ onClose, onCreate }) {
     setVariants(prev => prev.filter((_, i) => i !== index))
   }
 
+  function updateVariantChoice(variantIndex, choiceIndex, value) {
+    setVariants(prev => prev.map((v, i) => i !== variantIndex ? v : {
+      ...v,
+      choices: v.choices.map((c, ci) => ci === choiceIndex ? value : c),
+    }))
+  }
+
+  function addVariantChoice(variantIndex) {
+    setVariants(prev => prev.map((v, i) => i !== variantIndex ? v : {
+      ...v,
+      choices: [...v.choices, `Option ${v.choices.length + 1}`],
+    }))
+  }
+
+  function removeVariantChoice(variantIndex, choiceIndex) {
+    setVariants(prev => prev.map((v, i) => {
+      if (i !== variantIndex || v.choices.length <= 2) return v
+      return { ...v, choices: v.choices.filter((_, ci) => ci !== choiceIndex) }
+    }))
+  }
+
+  function updateMetadataField(variantIndex, fieldIndex, prop, value) {
+    setVariants(prev => prev.map((v, i) => i !== variantIndex ? v : {
+      ...v,
+      metadataFields: v.metadataFields.map((f, fi) => fi === fieldIndex ? { ...f, [prop]: value } : f),
+    }))
+  }
+
+  function addMetadataField(variantIndex) {
+    setVariants(prev => prev.map((v, i) => i !== variantIndex ? v : {
+      ...v,
+      metadataFields: [...v.metadataFields, { key: '', value: '' }],
+    }))
+  }
+
+  function removeMetadataField(variantIndex, fieldIndex) {
+    setVariants(prev => prev.map((v, i) => {
+      if (i !== variantIndex || v.metadataFields.length <= 1) return v
+      return { ...v, metadataFields: v.metadataFields.filter((_, fi) => fi !== fieldIndex) }
+    }))
+  }
+
+  // A value the simple field editor can represent: not an object/array.
+  // JSON mode intentionally allows more (nested objects, arrays, numbers,
+  // booleans) than the field editor can show — that's fine as long as we
+  // never silently mangle it converting between the two.
+  function isFlatValue(value) {
+    return value === null || typeof value !== 'object'
+  }
+
+  // Toggles a variant's metadata editor between structured key/value fields
+  // and raw JSON, converting whatever's currently there to the other shape.
+  function toggleMetadataMode(variantIndex) {
+    setVariants(prev => prev.map((v, i) => {
+      if (i !== variantIndex) return v
+      if (v.metadataMode === 'fields') {
+        const obj = {}
+        v.metadataFields.forEach(f => { if (f.key.trim()) obj[f.key.trim()] = f.value })
+        return { ...v, metadataMode: 'json', metadataJson: JSON.stringify(obj, null, 2), metadataError: null }
+      }
+      try {
+        const parsed = v.metadataJson.trim() ? JSON.parse(v.metadataJson) : {}
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          return { ...v, metadataError: 'Metadata must be a flat JSON object, e.g. {"key": "value"}' }
+        }
+        const entries = Object.entries(parsed)
+        if (entries.some(([, value]) => !isFlatValue(value))) {
+          return { ...v, metadataError: "This JSON has nested objects/arrays the field editor can't show without losing data — simplify it first, or keep using JSON mode." }
+        }
+        const fields = entries.map(([key, value]) => ({ key, value: String(value) }))
+        return { ...v, metadataMode: 'fields', metadataFields: fields.length ? fields : [{ key: '', value: '' }], metadataError: null }
+      } catch {
+        return { ...v, metadataError: 'Invalid JSON — fix it before switching back to fields' }
+      }
+    }))
+  }
+
+  // Resolves a variant's metadata (from whichever mode it's in) into a flat
+  // {key: value} object of strings, or null if empty. Throws with a
+  // human-readable message on invalid input so handleSubmit can show it.
+  function resolveVariantMetadata(v) {
+    if (v.metadataMode === 'json') {
+      if (!v.metadataJson.trim()) return null
+      let parsed
+      try {
+        parsed = JSON.parse(v.metadataJson)
+      } catch {
+        throw new Error(`Invalid JSON metadata for ${v.name || 'a variant'}`)
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error(`Metadata for ${v.name || 'a variant'} must be a flat JSON object`)
+      }
+      const entries = Object.entries(parsed)
+      if (entries.some(([, value]) => !isFlatValue(value))) {
+        throw new Error(`Metadata for ${v.name || 'a variant'} can't contain nested objects/arrays — values must be plain text, numbers, or booleans`)
+      }
+      const obj = {}
+      entries.forEach(([key, value]) => { obj[key] = String(value) })
+      return Object.keys(obj).length ? obj : null
+    }
+    const obj = {}
+    v.metadataFields.forEach(f => { if (f.key.trim()) obj[f.key.trim()] = f.value })
+    return Object.keys(obj).length ? obj : null
+  }
+
   const totalWeight = variants.reduce((sum, v) => sum + Number(v.weight), 0)
+  const isMultipleChoice = feedbackType === 'MULTIPLE_CHOICE'
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
     if (totalWeight !== 100) { setError('Variant weights must sum to 100'); return }
+    if (isMultipleChoice && variants.some(v => v.choices.some(c => !c.trim()))) {
+      setError('Choice options cannot be blank')
+      return
+    }
     setLoading(true)
     try {
+      const variantsWithMetadata = variants.map(v => ({ ...v, resolvedMetadata: resolveVariantMetadata(v) }))
       const activeApp = JSON.parse(localStorage.getItem('pulsesdk_active_app'))
       const res = await api.post('/experiments', {
         appId: activeApp.id,
         name,
-        trafficSplit: variants.map(v => ({ name: v.name, weight: Number(v.weight) })),
+        feedbackType,
+        trafficSplit: variantsWithMetadata.map(v => ({
+          name: v.name,
+          weight: Number(v.weight),
+          ...(isMultipleChoice && { choices: v.choices }),
+          metadata: v.resolvedMetadata,
+        })),
       })
       onCreate(res.data)
       onClose()
     } catch (err) {
-      setError(err.response?.data?.error ?? 'Failed to create experiment')
+      setError(err.response?.data?.error ?? err.message ?? 'Failed to create experiment')
     } finally {
       setLoading(false)
     }
@@ -63,7 +197,7 @@ function CreateExperimentModal({ onClose, onCreate }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50"
       style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-2xl shadow-xl w-full max-w-md p-6"
+      <div className="rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
         <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>New Experiment</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -76,6 +210,18 @@ function CreateExperimentModal({ onClose, onCreate }) {
               onBlur={e => e.target.style.boxShadow = 'none'}
               placeholder="e.g. Homepage Banner Test" required />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Feedback Type</label>
+            <select value={feedbackType} onChange={e => setFeedbackType(e.target.value)}
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}>
+              {feedbackTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+              How the app collects feedback for this experiment.
+            </p>
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Variants</label>
@@ -83,28 +229,118 @@ function CreateExperimentModal({ onClose, onCreate }) {
                 Total: {totalWeight}%
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {variants.map((v, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <input value={v.name} onChange={e => updateVariant(i, 'name', e.target.value)}
-                    className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    style={inputStyle}
-                    onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
-                    onBlur={e => e.target.style.boxShadow = 'none'}
-                    placeholder="Variant name" required />
-                  <input type="number" value={v.weight} onChange={e => updateVariant(i, 'weight', e.target.value)}
-                    className="w-20 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    style={inputStyle}
-                    onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
-                    onBlur={e => e.target.style.boxShadow = 'none'}
-                    min={0} max={100} required />
-                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>%</span>
-                  <button type="button" onClick={() => removeVariant(i)}
-                    className="text-lg leading-none disabled:opacity-30"
-                    style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
-                    disabled={variants.length <= 2}>×</button>
+                <div key={i} className="rounded-lg p-3" style={{ border: '1px solid var(--border)' }}>
+                  <div className="flex gap-2 items-center">
+                    <input value={v.name} onChange={e => updateVariant(i, 'name', e.target.value)}
+                      className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      style={inputStyle}
+                      onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                      onBlur={e => e.target.style.boxShadow = 'none'}
+                      placeholder="Variant name" required />
+                    <input type="number" value={v.weight} onChange={e => updateVariant(i, 'weight', e.target.value)}
+                      className="w-20 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      style={inputStyle}
+                      onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                      onBlur={e => e.target.style.boxShadow = 'none'}
+                      min={0} max={100} required />
+                    <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>%</span>
+                    <button type="button" onClick={() => removeVariant(i)}
+                      className="text-lg leading-none disabled:opacity-30"
+                      style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                      disabled={variants.length <= 2}>×</button>
+                  </div>
+
+                  {isMultipleChoice && (
+                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                      <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                        Choice Options for {v.name || `Variant ${i + 1}`}
+                      </label>
+                      <div className="space-y-2">
+                        {v.choices.map((c, ci) => (
+                          <div key={ci} className="flex gap-2 items-center">
+                            <input value={c} onChange={e => updateVariantChoice(i, ci, e.target.value)}
+                              className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}
+                              onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                              onBlur={e => e.target.style.boxShadow = 'none'}
+                              placeholder={`Option ${ci + 1}`} required />
+                            <button type="button" onClick={() => removeVariantChoice(i, ci)}
+                              className="text-lg leading-none disabled:opacity-30"
+                              style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                              disabled={v.choices.length <= 2}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button" onClick={() => addVariantChoice(i)}
+                        className="mt-2 text-sm font-medium"
+                        style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        + Add option
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        Metadata for {v.name || `Variant ${i + 1}`}
+                      </label>
+                      <button type="button" onClick={() => toggleMetadataMode(i)}
+                        title={v.metadataMode === 'fields' ? 'Switch to JSON' : 'Switch to fields'}
+                        className="flex items-center justify-center rounded-md p-1"
+                        style={{ color: 'var(--text-tertiary)', background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                        <Code size={14} />
+                      </button>
+                    </div>
+
+                    {v.metadataMode === 'fields' ? (
+                      <>
+                        <div className="space-y-2">
+                          {v.metadataFields.map((f, fi) => (
+                            <div key={fi} className="flex gap-2 items-center">
+                              <input value={f.key} onChange={e => updateMetadataField(i, fi, 'key', e.target.value)}
+                                className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}
+                                onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                                onBlur={e => e.target.style.boxShadow = 'none'}
+                                placeholder="key (e.g. itemLimit)" />
+                              <input value={f.value} onChange={e => updateMetadataField(i, fi, 'value', e.target.value)}
+                                className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle}
+                                onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                                onBlur={e => e.target.style.boxShadow = 'none'}
+                                placeholder="value (e.g. 25)" />
+                              <button type="button" onClick={() => removeMetadataField(i, fi)}
+                                className="text-lg leading-none disabled:opacity-30"
+                                style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                                onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                                disabled={v.metadataFields.length <= 1}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => addMetadataField(i)}
+                          className="mt-2 text-sm font-medium"
+                          style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                          + Add field
+                        </button>
+                      </>
+                    ) : (
+                      <textarea value={v.metadataJson} onChange={e => updateVariant(i, 'metadataJson', e.target.value)}
+                        rows={5} spellCheck={false}
+                        className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none"
+                        style={inputStyle}
+                        onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+                        onBlur={e => e.target.style.boxShadow = 'none'}
+                        placeholder={'{\n  "itemLimit": "25"\n}'} />
+                    )}
+                    {v.metadataError && <p className="text-sm mt-1" style={{ color: '#EF4444' }}>{v.metadataError}</p>}
+                    <p className="text-sm mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                      Optional. Arbitrary data for your app to read via this variant's metadata — the SDK doesn't interpret it.
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

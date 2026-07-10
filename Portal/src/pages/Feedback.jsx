@@ -158,10 +158,11 @@ export default function Feedback() {
   const [sort, setSort] = useState({ key: 'createdAt', direction: 'desc' })
   const [showComments, setShowComments] = useState(true)
 
-  // Text feedback filters
+  // General text feedback — always standalone (no variant), fetched
+  // independently of the Structured Responses filters below so those
+  // selects can never restrict what shows up here.
+  const [generalFeedback, setGeneralFeedback] = useState([])
   const [textSearch, setTextSearch] = useState('')
-  const [textExperimentFilter, setTextExperimentFilter] = useState('')
-  const [textVariantFilter, setTextVariantFilter] = useState('')
   const [textSort, setTextSort] = useState({ key: 'createdAt', direction: 'desc' })
 
   useEffect(() => {
@@ -180,15 +181,14 @@ export default function Feedback() {
     load()
   }, [])
 
-  // Fetch feedback whenever filters change — all filtering done server-side
+  // Fetch structured feedback whenever its filters change — all filtering done server-side
   useEffect(() => {
     async function applyFilters() {
       try {
         const params = new URLSearchParams()
         params.set('limit', '100')
         if (typeFilter) params.set('type', typeFilter)
-        if (experimentFilter && experimentFilter !== '__standalone__') params.set('experimentId', experimentFilter)
-        if (experimentFilter === '__standalone__') params.set('standalone', 'true')
+        if (experimentFilter) params.set('experimentId', experimentFilter)
         if (variantFilter) params.set('variantId', variantFilter)
 
         const fbRes = await api.get(`/feedback?${params.toString()}`)
@@ -203,6 +203,21 @@ export default function Feedback() {
     }
     if (!loading) applyFilters()
   }, [typeFilter, experimentFilter, variantFilter, loading])
+
+  // Fetch general text feedback once — no filters to react to besides load
+  useEffect(() => {
+    async function loadGeneral() {
+      try {
+        const params = new URLSearchParams()
+        params.set('type', 'TEXT')
+        params.set('standalone', 'true')
+        params.set('limit', '100')
+        const res = await api.get(`/feedback?${params.toString()}`)
+        setGeneralFeedback(res.data.responses)
+      } catch (err) { console.error(err) }
+    }
+    if (!loading) loadGeneral()
+  }, [loading])
 
   function toggleSort(key) {
     setSort(prev => prev.key === key
@@ -234,9 +249,9 @@ export default function Feedback() {
       : sort
   )
 
-  // Server already filtered by experiment/variant/standalone — only apply search client-side
-  const filteredText = feedback.filter(f => {
-    if (f.type !== 'TEXT') return false
+  // General feedback is fetched pre-filtered to standalone TEXT responses —
+  // only search needs to be applied client-side.
+  const filteredGeneral = generalFeedback.filter(f => {
     const sl = textSearch.toLowerCase()
     return !textSearch ||
       (f.user?.externalUserId ?? '').toLowerCase().includes(sl) ||
@@ -244,21 +259,16 @@ export default function Feedback() {
       (typeof f.value === 'string' ? f.value : '').toLowerCase().includes(sl)
   })
 
-  const sortedText = useSortedData(
-    filteredText.map(f => ({
+  const sortedGeneral = useSortedData(
+    filteredGeneral.map(f => ({
       ...f,
       userLabel: f.user?.externalUserId ?? '',
       valueStr: typeof f.value === 'string' ? f.value : JSON.stringify(f.value),
-      isStandalone: !f.variantId && !f.experimentId,
     })),
     textSort.key === 'user' ? { key: 'userLabel', direction: textSort.direction }
       : textSort.key === 'value' ? { key: 'valueStr', direction: textSort.direction }
       : textSort
   )
-
-  // Pin standalone feedback to top
-  const standaloneText = sortedText.filter(f => f.isStandalone)
-  const linkedText = sortedText.filter(f => !f.isStandalone)
 
   if (loading) return (
     <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-tertiary)' }}>Loading...</div>
@@ -325,7 +335,10 @@ export default function Feedback() {
         )}
       </div>
 
-      {/* Text feedback */}
+      {/* General text feedback — never tied to an experiment, so there's
+          nothing here to filter by besides search and sort. The individual
+          cards below get an accent treatment to stand out as the most
+          direct, unprompted signal on this page. */}
       <div className="rounded-xl" style={cardStyle}>
         <div className="px-6 py-4 flex flex-wrap items-center gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex-1">
@@ -337,22 +350,6 @@ export default function Feedback() {
             className="rounded-lg px-3 py-1.5 text-sm focus:outline-none w-52" style={inputStyle}
             onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
             onBlur={e => e.target.style.boxShadow = 'none'} />
-          <select value={textExperimentFilter}
-            onChange={e => { setTextExperimentFilter(e.target.value); setTextVariantFilter('') }}
-            className="rounded-lg px-3 py-1.5 text-sm focus:outline-none" style={inputStyle}>
-            <option value="">All experiments</option>
-            <option value="__standalone__">No experiment</option>
-            {experiments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-          {textExperimentFilter && textExperimentFilter !== '__standalone__' && (
-            <select value={textVariantFilter} onChange={e => setTextVariantFilter(e.target.value)}
-              className="rounded-lg px-3 py-1.5 text-sm focus:outline-none" style={inputStyle}>
-              <option value="">All variants</option>
-              {(experiments.find(e => e.id === textExperimentFilter)?.variants ?? []).map(v => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
-            </select>
-          )}
           <select value={textSort.key + '_' + textSort.direction}
             onChange={e => { const [key, direction] = e.target.value.split('_'); setTextSort({ key, direction }) }}
             className="rounded-lg px-3 py-1.5 text-sm focus:outline-none" style={inputStyle}>
@@ -363,81 +360,31 @@ export default function Feedback() {
           </select>
         </div>
 
-        {sortedText.length === 0 ? (
+        {sortedGeneral.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            No text responses match your filters
+            No text feedback matches your filters
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Standalone feedback — pinned to top with accent treatment */}
-            {standaloneText.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
-                  <span className="text-sm font-medium px-3 py-0.5 rounded-full"
-                    style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)', border: '1px solid var(--accent-border)' }}>
-                    General App Feedback
+          <div className="p-6 space-y-3">
+            {sortedGeneral.map(f => (
+              <div key={f.id} className="rounded-xl p-5"
+                style={{ background: 'var(--accent-subtle)', border: '2px solid var(--accent-border)' }}>
+                <p className="text-sm leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {f.valueStr}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3"
+                  style={{ borderTop: '1px solid var(--accent-border)' }}>
+                  <span className="text-sm font-medium" style={{ color: 'var(--accent-text)' }}>
+                    {f.user?.externalUserId ?? 'Anonymous'}
                   </span>
-                  <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                  {f.screenId && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.screenId}</span>}
+                  {f.appVersion && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>v{f.appVersion}</span>}
+                  <span className="text-sm ml-auto" style={{ color: 'var(--accent-text)' }}>
+                    {new Date(f.createdAt).toLocaleString()}
+                  </span>
                 </div>
-                {standaloneText.map(f => (
-                  <div key={f.id} className="rounded-xl p-5"
-                    style={{ background: 'var(--accent-subtle)', border: '2px solid var(--accent-border)' }}>
-                    <p className="text-sm leading-relaxed font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {f.valueStr}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3"
-                      style={{ borderTop: '1px solid var(--accent-border)' }}>
-                      <span className="text-sm font-medium" style={{ color: 'var(--accent-text)' }}>
-                        {f.user?.externalUserId ?? 'Anonymous'}
-                      </span>
-                      {f.screenId && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.screenId}</span>}
-                      {f.appVersion && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>v{f.appVersion}</span>}
-                      <span className="text-sm ml-auto" style={{ color: 'var(--accent-text)' }}>
-                        {new Date(f.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
               </div>
-            )}
-
-            {/* Experiment-linked text feedback */}
-            {linkedText.length > 0 && (
-              <div className="space-y-3">
-                {standaloneText.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
-                    <span className="text-sm font-medium px-3 py-0.5 rounded-full"
-                      style={{ background: 'var(--bg-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                      Experiment Feedback
-                    </span>
-                    <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
-                  </div>
-                )}
-                {linkedText.map(f => (
-                  <div key={f.id} className="rounded-xl p-5"
-                    style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
-                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                      {f.valueStr}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3"
-                      style={{ borderTop: '1px solid var(--border)' }}>
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {f.user?.externalUserId ?? 'Anonymous'}
-                      </span>
-                      {f.experimentName && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.experimentName}</span>}
-                      {f.variant && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.variant.name}</span>}
-                      {f.screenId && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f.screenId}</span>}
-                      {f.appVersion && <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>v{f.appVersion}</span>}
-                      <span className="text-sm ml-auto" style={{ color: 'var(--text-tertiary)' }}>
-                        {new Date(f.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         )}
       </div>
