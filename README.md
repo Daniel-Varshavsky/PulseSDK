@@ -11,7 +11,7 @@ prompts from the **Developer Portal**, and the SDK handles deterministic
 variant assignment, offline-safe feedback queuing, and syncing everything
 back to the server.
 
-Full docs: **[pulsesdk docs site](https://daniel-varshavsky.github.io/pulsesdk/)**
+Full docs: **[PulseSDK docs site](https://daniel-varshavsky.github.io/PulseSDK/)**
 (once GitHub Pages is enabled — see below) or browse [`docs/`](docs/) directly.
 This README covers the essentials.
 
@@ -60,11 +60,13 @@ This README covers the essentials.
 
 ## Demo Video
 
-📺 **[Watch the demo](docs/assets/video/pulsesdk-demo.webm)** — a ~2-minute
-tour covering the architecture, creating an experiment in the Portal, the
-two-line Android integration, and live results coming back. (Also embedded
-on the [docs site](https://daniel-varshavsky.github.io/pulsesdk/) once
-GitHub Pages is enabled.)
+📺 **[Watch the demo](docs/assets/video/pulsesdk-demo.webm)** — a ~2½-minute
+tour of the **Pulse loop** running for real, start to finish: a user asks
+for dark mode → the team answers with a Light-vs-Dark experiment → users
+respond to the variants → Dark Theme wins and ships as a permanent feature.
+(Also embedded on the
+[docs site](https://daniel-varshavsky.github.io/pulsesdk/) once GitHub
+Pages is enabled.)
 
 ---
 
