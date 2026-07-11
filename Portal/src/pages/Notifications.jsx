@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, Send } from 'lucide-react'
-import api from '../lib/api'
+import api, { getActiveApp } from '../lib/api'
 
 export default function Notifications() {
   const [experiments, setExperiments] = useState([])
@@ -49,6 +49,7 @@ export default function Notifications() {
     e.preventDefault()
     setError(null)
     setResult(null)
+    if (!getActiveApp()) { setError('Select or create an app before sending a notification'); return }
     setSending(true)
     try {
       const res = await api.post('/notifications/send', {

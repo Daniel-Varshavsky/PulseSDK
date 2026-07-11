@@ -144,6 +144,16 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
+        {!activeApp && (
+          <div className="px-6 py-3 flex items-center justify-between text-sm"
+            style={{ background: 'var(--accent-subtle)', borderBottom: '1px solid var(--accent-border)', color: 'var(--accent-text)' }}>
+            <span>You don't have an app selected yet. Ask an app owner to invite you, or create your own.</span>
+            <button onClick={() => navigate('/settings')}
+              className="font-medium" style={{ color: 'var(--accent-text)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Create app
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

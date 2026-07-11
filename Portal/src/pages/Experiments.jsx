@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, FlaskConical, Code } from 'lucide-react'
-import api from '../lib/api'
+import api, { getActiveApp } from '../lib/api'
 
 const statusStyle = {
   ACTIVE: { background: 'var(--status-active-bg)', color: 'var(--status-active-text)' },
@@ -165,6 +165,8 @@ function CreateExperimentModal({ onClose, onCreate }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
+    const activeApp = getActiveApp()
+    if (!activeApp) { setError('Select or create an app before creating an experiment'); return }
     if (totalWeight !== 100) { setError('Variant weights must sum to 100'); return }
     if (isMultipleChoice && variants.some(v => v.choices.some(c => !c.trim()))) {
       setError('Choice options cannot be blank')
@@ -173,7 +175,6 @@ function CreateExperimentModal({ onClose, onCreate }) {
     setLoading(true)
     try {
       const variantsWithMetadata = variants.map(v => ({ ...v, resolvedMetadata: resolveVariantMetadata(v) }))
-      const activeApp = JSON.parse(localStorage.getItem('pulsesdk_active_app'))
       const res = await api.post('/experiments', {
         appId: activeApp.id,
         name,
