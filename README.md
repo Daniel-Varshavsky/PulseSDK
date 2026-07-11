@@ -60,7 +60,7 @@ This README covers the essentials.
 
 ## Demo Video
 
-📺 **[Watch the demo](docs/assets/video/pulsesdk-demo.webm)** — a ~2½-minute
+📺 **[Watch the demo](https://raw.githubusercontent.com/Daniel-Varshavsky/PulseSDK/docs/assets/video/pulsesdk-demo.webm)** — a ~2½-minute
 tour of the **Pulse loop** running for real, start to finish: a user asks
 for dark mode → the team answers with a Light-vs-Dark experiment → users
 respond to the variants → Dark Theme wins and ships as a permanent feature.
