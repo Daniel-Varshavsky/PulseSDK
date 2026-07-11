@@ -63,12 +63,16 @@ export default function Settings() {
   useEffect(() => {
     async function load() {
       try {
+        // /apps/:id needs an active app's API key to authenticate at all —
+        // skip it entirely when there isn't one instead of letting
+        // activeApp.id throw before any request even fires. /auth/me and
+        // /apps/my are JWT-authenticated and work regardless.
         const [appRes, accountRes, appsRes] = await Promise.all([
-          api.get(`/apps/${activeApp.id}`),
+          activeApp ? api.get(`/apps/${activeApp.id}`) : Promise.resolve(null),
           api.get('/auth/me'),
           api.get('/apps/my'),
         ])
-        setApp(appRes.data)
+        if (appRes) setApp(appRes.data)
         setAccount(accountRes.data)
         setApps(appsRes.data)
       } catch (err) {
@@ -87,6 +91,7 @@ export default function Settings() {
   }
 
   async function handleRegenerateKey() {
+    if (!activeApp) return
     if (!window.confirm('Are you sure? Your existing API key will stop working immediately.')) return
     setRegenerating(true)
     try {
@@ -236,36 +241,43 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* App settings */}
-      <div className="rounded-xl p-6 space-y-5" style={cardStyle}>
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>App Settings — {app?.name}</h3>
-        <div>
-          <label style={labelStyle}>API Key</label>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 rounded-lg px-3 py-2 text-sm font-mono truncate"
-              style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-              {app?.apiKey}
-            </code>
-            <button onClick={handleCopyApiKey} style={btnSecondary} className="flex items-center gap-1.5">
-              {copied
-                ? <Check size={14} style={{ color: 'var(--accent)' }} />
-                : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-            <button onClick={handleRegenerateKey} disabled={regenerating} style={btnSecondary} className="flex items-center gap-1.5">
-              <RefreshCw size={14} className={regenerating ? 'animate-spin' : ''} />
-              Regenerate
-            </button>
+      {/* App settings — nothing to show without an active app selected */}
+      {activeApp && (
+        <div className="rounded-xl p-6 space-y-5" style={cardStyle}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>App Settings — {app?.name}</h3>
+          <div>
+            <label style={labelStyle}>API Key</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded-lg px-3 py-2 text-sm font-mono truncate"
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                {app?.apiKey}
+              </code>
+              <button onClick={handleCopyApiKey} style={btnSecondary} className="flex items-center gap-1.5">
+                {copied
+                  ? <Check size={14} style={{ color: 'var(--accent)' }} />
+                  : <Copy size={14} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <button onClick={handleRegenerateKey} disabled={regenerating} style={btnSecondary} className="flex items-center gap-1.5">
+                <RefreshCw size={14} className={regenerating ? 'animate-spin' : ''} />
+                Regenerate
+              </button>
+            </div>
+            <p className="text-sm mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              Use this key to initialize PulseSDK in your Android app.
+            </p>
           </div>
-          <p className="text-sm mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
-            Use this key to initialize PulseSDK in your Android app.
-          </p>
         </div>
-      </div>
+      )}
 
       {/* My Apps */}
       <div className="rounded-xl p-6 space-y-4" style={cardStyle}>
         <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>My Apps</h3>
+        {apps.length === 0 && (
+          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            You're not a member of any app yet. Create one below, or ask an app owner to invite you.
+          </p>
+        )}
         <div className="space-y-2">
           {apps.map(a => (
             <div key={a.id} className="flex items-center justify-between rounded-lg px-4 py-3"
@@ -274,7 +286,7 @@ export default function Settings() {
                 <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
                 <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{a.role}</p>
               </div>
-              {a.id !== activeApp.id ? (
+              {a.id !== activeApp?.id ? (
                 <button onClick={() => handleSwitchApp(a)}
                   className="text-sm font-medium" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
                   Switch to this app

@@ -14,16 +14,18 @@ import Settings from './pages/Settings'
 import Team from './pages/Team'
 
 function ProtectedRoute({ children }) {
+  // Only the token gates access here — an active app is not required.
+  // A newly registered account legitimately has zero apps until an owner
+  // invites them (see Login.jsx's "Skip" option); Layout and every page
+  // already handle a null active app gracefully (empty/zero states).
   const loggedIn = !!getToken()
-  const hasApp = !!getActiveApp()
-  if (!loggedIn || !hasApp) return <Navigate to="/login" replace />
+  if (!loggedIn) return <Navigate to="/login" replace />
   return children
 }
 
 function PublicRoute({ children }) {
   const loggedIn = !!getToken()
-  const hasApp = !!getActiveApp()
-  if (loggedIn && hasApp) return <Navigate to="/dashboard" replace />
+  if (loggedIn) return <Navigate to="/dashboard" replace />
   return children
 }
 

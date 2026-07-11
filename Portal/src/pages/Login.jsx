@@ -89,6 +89,12 @@ export default function Login() {
     }
   }
 
+  // No active app to set — Layout already handles that state (shows
+  // "Select app" and lets them pick one once an owner invites them).
+  function handleSkipAppCreation() {
+    navigate('/dashboard')
+  }
+
   function handleSelectApp(app) {
     setActiveApp(app)
     navigate('/dashboard')
@@ -99,7 +105,7 @@ export default function Login() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 w-full max-w-md">
           {apps.length === 0
-            ? <CreateAppForm onSubmit={handleCreateApp} />
+            ? <CreateAppForm onSubmit={handleCreateApp} onSkip={handleSkipAppCreation} />
             : <AppPicker apps={apps} onSelect={handleSelectApp} onCreateNew={() => setApps([])} />
           }
         </div>
@@ -196,7 +202,7 @@ function AppPicker({ apps, onSelect, onCreateNew }) {
   )
 }
 
-function CreateAppForm({ onSubmit }) {
+function CreateAppForm({ onSubmit, onSkip }) {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -210,7 +216,7 @@ function CreateAppForm({ onSubmit }) {
   return (
     <>
       <h2 className="text-lg font-bold text-gray-900 mb-1">Create your first app</h2>
-      <p className="text-sm text-gray-500 mb-4">You don't have any apps yet. Create one to get started.</p>
+      <p className="text-sm text-gray-500 mb-4">You don't have any apps yet. Create one to get started, or skip this if you're waiting to be invited to someone else's app.</p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">App name</label>
@@ -223,6 +229,10 @@ function CreateAppForm({ onSubmit }) {
           {loading ? 'Creating...' : 'Create app'}
         </button>
       </form>
+      <button onClick={onSkip}
+        className="mt-4 w-full text-sm text-teal-600 hover:text-teal-700 font-medium">
+        Skip — I'm waiting for an invite
+      </button>
     </>
   )
 }
