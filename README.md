@@ -67,7 +67,7 @@ and ships as a permanent feature.
 
 ![PulseSDK demo — the Pulse loop running end to end](docs/assets/video/pulsesdk-loop-highlight.gif)
 
-📺 That's a 20-second highlight reel. **[Watch the full ~2½-minute walkthrough](https://raw.githubusercontent.com/Daniel-Varshavsky/PulseSDK/docs/assets/video/pulsesdk-demo.mp4)**
+📺 That's a 20-second highlight reel. **[Watch the full ~2½-minute walkthrough](https://raw.githubusercontent.com/Daniel-Varshavsky/PulseSDK/main/docs/assets/video/pulsesdk-demo.mp4)**
 (architecture, Portal tour, the two-line Android integration, and the full
 loop above with no cuts) — click through to GitHub's file view to play it.
 Also embedded, full quality, on the
