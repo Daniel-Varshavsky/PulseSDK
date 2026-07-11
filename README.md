@@ -11,7 +11,7 @@ prompts from the **Developer Portal**, and the SDK handles deterministic
 variant assignment, offline-safe feedback queuing, and syncing everything
 back to the server.
 
-Full docs: **[pulsesdk docs site](https://daniel-varshavsky.github.io/PulseSDK/)**
+Full docs: **[PulseSDK docs site](https://daniel-varshavsky.github.io/PulseSDK/)**
 (once GitHub Pages is enabled — see below) or browse [`docs/`](docs/) directly.
 This README covers the essentials.
 
