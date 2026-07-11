@@ -65,10 +65,7 @@ against the real app: a user asks for dark mode → the team answers with a
 Light-vs-Dark experiment → users respond to the variants → Dark Theme wins
 and ships as a permanent feature.
 
-![PulseSDK demo — the Pulse loop running end to end](docs/assets/video/pulsesdk-loop-highlight.gif)
-
-📺 That's a 20-second highlight reel.
-https://github.com/user-attachments/assets/82150f5d-9ed1-475a-b5f0-8dcfed97e737
+**[Watch the full ~2½-minute walkthrough](https://github.com/user-attachments/assets/82150f5d-9ed1-475a-b5f0-8dcfed97e737)**
 (architecture, Portal tour, the two-line Android integration, and the full
 loop above with no cuts) — click through to GitHub's file view to play it.
 Also embedded, full quality, on the
