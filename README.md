@@ -60,9 +60,11 @@ This README covers the essentials.
 
 ## Demo Video
 
-📺 *Video coming soon — link will go here.* A 90-second walkthrough covering
-the architecture, creating an experiment in the Portal, calling the SDK from
-Android, and watching results come back live.
+📺 **[Watch the demo](docs/assets/video/pulsesdk-demo.webm)** — a ~2-minute
+tour covering the architecture, creating an experiment in the Portal, the
+two-line Android integration, and live results coming back. (Also embedded
+on the [docs site](https://daniel-varshavsky.github.io/pulsesdk/) once
+GitHub Pages is enabled.)
 
 ---
 
