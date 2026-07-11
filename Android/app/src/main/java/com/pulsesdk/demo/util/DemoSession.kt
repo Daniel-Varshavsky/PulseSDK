@@ -1,4 +1,4 @@
-package com.pulsesdk.demo
+package com.pulsesdk.demo.util
 
 import android.content.Context
 

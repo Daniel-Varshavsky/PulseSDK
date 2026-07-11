@@ -7,6 +7,7 @@ export default function Notifications() {
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [firebaseConfigured, setFirebaseConfigured] = useState(null)
   const [form, setForm] = useState({ title: '', body: '', audienceType: 'ALL', experimentId: '' })
 
   const inputStyle = {
@@ -30,6 +31,16 @@ export default function Notifications() {
     load()
   }, [])
 
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const res = await api.get('/notifications/status')
+        setFirebaseConfigured(res.data.firebaseConfigured)
+      } catch (err) { console.error(err) }
+    }
+    loadStatus()
+  }, [])
+
   function handleChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
@@ -51,7 +62,12 @@ export default function Notifications() {
       setResult(res.data)
       setForm(prev => ({ ...prev, title: '', body: '' }))
     } catch (err) {
-      setError(err.response?.data?.error ?? 'Failed to send notification')
+      // A non-2xx response (e.g. Firebase not configured) rejects here —
+      // it never reaches setResult, so any detail like tokenCount has to
+      // be folded into the error message itself.
+      const data = err.response?.data
+      const message = data?.error ?? 'Failed to send notification'
+      setError(data?.tokenCount != null ? `${message} (${data.tokenCount} devices targeted)` : message)
     } finally {
       setSending(false)
     }
@@ -116,8 +132,6 @@ export default function Notifications() {
             <div className="rounded-lg px-4 py-3" style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}>
               {result.sent === 0 && result.message ? (
                 <p className="text-sm" style={{ color: 'var(--accent-text)' }}>{result.message}</p>
-              ) : result.error ? (
-                <p className="text-sm" style={{ color: '#D97706' }}>{result.error} ({result.tokenCount} devices targeted)</p>
               ) : (
                 <p className="text-sm" style={{ color: 'var(--accent-text)' }}>
                   Sent to {result.sent} device{result.sent !== 1 ? 's' : ''}
@@ -138,19 +152,37 @@ export default function Notifications() {
         </form>
       </div>
 
-      {/* Firebase warning */}
-      <div className="rounded-xl px-5 py-4" style={{ background: 'var(--status-paused-bg)', border: '1px solid var(--border)' }}>
-        <div className="flex items-start gap-3">
-          <Bell size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--status-paused-text)' }} />
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'var(--status-paused-text)' }}>Firebase not configured</p>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Push notifications require Firebase credentials to be set in the server environment.
-              Add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to your .env file.
-            </p>
+      {/* Firebase status — reflects the server's actual configuration,
+          checked via GET /notifications/status, instead of always warning
+          regardless of whether it's really set up. */}
+      {firebaseConfigured === false && (
+        <div className="rounded-xl px-5 py-4" style={{ background: 'var(--status-paused-bg)', border: '1px solid var(--border)' }}>
+          <div className="flex items-start gap-3">
+            <Bell size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--status-paused-text)' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--status-paused-text)' }}>Firebase not configured</p>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                Push notifications require Firebase credentials to be set in the server environment.
+                Add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to your .env file.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {firebaseConfigured === true && (
+        <div className="rounded-xl px-5 py-4" style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}>
+          <div className="flex items-start gap-3">
+            <Bell size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--accent-text)' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--accent-text)' }}>Firebase is configured</p>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                Push notifications are enabled for this server.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

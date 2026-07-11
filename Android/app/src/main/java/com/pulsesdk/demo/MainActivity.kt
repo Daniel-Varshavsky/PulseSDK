@@ -5,78 +5,61 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.RatingBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.pulsesdk.PulseMessagingService
 import com.pulsesdk.PulseSDK
 import com.pulsesdk.VariantResult
-
-/**
- * One page of the main-screen carousel — either a live experiment (with its
- * assigned variant) or the trailing general-info page. The set of
- * experiment names isn't hardcoded anywhere: PulseSDK.getActiveVariants()
- * reports whatever's currently active in the Portal, and the app just
- * builds one card per result.
- */
-private sealed class DemoCard {
-    data class Experiment(val variant: VariantResult) : DemoCard()
-    object General : DemoCard()
-}
-
-/**
- * Purely a demo-app trick to show two variants can look genuinely
- * different, not a PulseSDK feature — these colors are hardcoded here,
- * not fetched from anywhere.
- */
-private data class DemoPalette(
-    val bgBase: String,
-    val bgSurface: String,
-    val textPrimary: String,
-    val textSecondary: String,
-    val accent: String,
-    val accentTextOn: String,
-)
-
-private val LIGHT_PALETTE = DemoPalette(
-    bgBase = "#F8FAFC",
-    bgSurface = "#FFFFFF",
-    textPrimary = "#111827",
-    textSecondary = "#4B5563",
-    accent = "#0D9488",
-    accentTextOn = "#FFFFFF",
-)
-
-private val BLUE_DARK_PALETTE = DemoPalette(
-    bgBase = "#0F172A",
-    bgSurface = "#1E293B",
-    textPrimary = "#F1F5F9",
-    textSecondary = "#CBD5E1",
-    accent = "#3B82F6",
-    accentTextOn = "#FFFFFF",
-)
+import com.pulsesdk.demo.model.DemoPalette
+import com.pulsesdk.demo.util.AppTheme
+import com.pulsesdk.demo.util.DemoSession
 
 class MainActivity : AppCompatActivity() {
+
+    /**
+     * One page of the main-screen carousel — either a live experiment
+     * (with its assigned variant) or the trailing general-info page. The
+     * set of experiment names isn't hardcoded anywhere:
+     * PulseSDK.getActiveVariants() reports whatever's currently active in
+     * the Portal, and the app just builds one card per result. Nested
+     * here rather than top-level since it's only ever used by this class.
+     */
+    private sealed class DemoCard {
+        data class Experiment(val variant: VariantResult) : DemoCard()
+        object General : DemoCard()
+    }
 
     private var cards: List<DemoCard> = emptyList()
     private var currentCardIndex = 0
     private var currentVariant: VariantResult? = null
+
+    // Resolved once per refreshCards() call from whatever's currently
+    // active — see AppTheme.resolveAppPalette(). Defaults to light until
+    // the first fetch resolves.
+    private var appPalette: DemoPalette = AppTheme.LIGHT_PALETTE
 
     private var ratingBarWidget: RatingBar? = null
     private var thumbsUpButton: MaterialButton? = null
@@ -149,7 +132,9 @@ class MainActivity : AppCompatActivity() {
     private fun refreshCards(preserveIndex: Int? = null) {
         Thread {
             val variants = PulseSDK.getActiveVariants()
+            val palette = AppTheme.resolveAppPalette(variants)
             runOnUiThread {
+                appPalette = palette
                 cards = variants.map { DemoCard.Experiment(it) } + DemoCard.General
                 val target = (preserveIndex ?: 0).coerceIn(0, cards.size - 1)
                 showCard(target)
@@ -203,9 +188,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.prevExperimentButton).visibility = View.GONE
         findViewById<View>(R.id.nextExperimentButton).visibility = View.GONE
         indicator.visibility = View.GONE
+        applyMetadataFeatures(null)
+        applyMetadataSelect(null, Color.parseColor(appPalette.textPrimary))
 
         clearFeedbackWidgetState()
-        applyTheme(LIGHT_PALETTE)
+        applyTheme(appPalette)
     }
 
     private fun showGeneralCard() {
@@ -229,9 +216,11 @@ class MainActivity : AppCompatActivity() {
         feedbackPrompt.visibility = View.GONE
         feedbackWidgetContainer.visibility = View.GONE
         submitFeedbackButton.visibility = View.GONE
+        applyMetadataFeatures(null)
+        applyMetadataSelect(null, Color.parseColor(appPalette.textPrimary))
 
         clearFeedbackWidgetState()
-        applyTheme(LIGHT_PALETTE)
+        applyTheme(appPalette)
     }
 
     private fun showExperimentCard(variant: VariantResult) {
@@ -250,9 +239,12 @@ class MainActivity : AppCompatActivity() {
         variantLabel.text = getString(R.string.main_variant_label, variant.variantName)
         variantLabel.visibility = View.VISIBLE
 
-        // Which visual treatment a variant gets is derived from its stable
-        // ID, not its name — a name-based check (e.g. endsWith("B")) breaks
-        // the moment a developer names variants anything else.
+        // The CTA copy still varies per-variant, derived from the variant's
+        // stable ID rather than its name (a name-based check like
+        // endsWith("B") breaks the moment a developer names variants
+        // anything else) — this is independent of the app-wide color
+        // theme below, so experiments that don't drive appTheme can still
+        // visibly differ between their own variants.
         val useAlternateStyle = variant.variantId.hashCode() and 1 != 0
         ctaButton.text = if (useAlternateStyle) getString(R.string.main_cta_variant_b) else getString(R.string.main_cta_default)
         ctaButton.visibility = View.VISIBLE
@@ -266,8 +258,84 @@ class MainActivity : AppCompatActivity() {
         feedbackPrompt.visibility = View.VISIBLE
         feedbackWidgetContainer.visibility = View.VISIBLE
         submitFeedbackButton.visibility = View.VISIBLE
+        applyMetadataFeatures(variant.metadata)
+        applyMetadataSelect(variant.metadata, Color.parseColor(appPalette.textPrimary))
 
-        applyTheme(if (useAlternateStyle) BLUE_DARK_PALETTE else LIGHT_PALETTE)
+        applyTheme(appPalette)
+    }
+
+    /**
+     * Demonstrates a variant actually changing what the app does, not just
+     * how it looks: when a variant's metadata sets a numeric "itemLimit",
+     * show that many items from a small local suggestion list. Variants
+     * without it (or with a non-numeric/zero value) show nothing here,
+     * same as before metadata existed — this is additive, not required.
+     */
+    private fun applyMetadataFeatures(metadata: Map<String, String>?) {
+        val container = findViewById<View>(R.id.metadataFeaturesContainer)
+        val list = findViewById<LinearLayout>(R.id.metadataFeaturesList)
+        list.removeAllViews()
+
+        val limit = metadata?.get("itemLimit")?.toIntOrNull()
+        if (limit == null || limit <= 0) {
+            container.visibility = View.GONE
+            return
+        }
+
+        resources.getStringArray(R.array.main_feature_suggestions).take(limit).forEach { suggestion ->
+            list.addView(TextView(this).apply {
+                text = "•  $suggestion"
+                textSize = 13f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = (2 * resources.displayMetrics.density).toInt() }
+            })
+        }
+        container.visibility = View.VISIBLE
+    }
+
+    /**
+     * A second, independent demonstration of metadata driving real app
+     * behavior: a variant's metadata can set "selectOptions" as a
+     * comma-separated list, which populates a dropdown here. Variants
+     * without it show nothing, same as applyMetadataFeatures().
+     *
+     * [textColor] is passed in rather than read from applyTheme() because
+     * this needs to run before applyTheme() applies the palette — the
+     * Spinner's collapsed/inline view sits directly on the card, so its
+     * text must match the card's forced palette rather than whatever the
+     * system's real day/night mode happens to resolve to (the same class
+     * of mismatch that broke the toolbar popup earlier). The dropdown
+     * list itself is left un-tinted on purpose — it's a floating overlay
+     * like the toolbar popup, not part of the card surface, so it should
+     * follow the real system theme instead.
+     */
+    private fun applyMetadataSelect(metadata: Map<String, String>?, textColor: Int) {
+        val container = findViewById<View>(R.id.metadataSelectContainer)
+        val spinner = findViewById<Spinner>(R.id.metadataSelectSpinner)
+
+        val options = metadata?.get("selectOptions")
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+
+        if (options.isEmpty()) {
+            container.visibility = View.GONE
+            spinner.adapter = null
+            return
+        }
+
+        spinner.adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, options) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(textColor)
+                return view
+            }
+        }.apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+
+        container.visibility = View.VISIBLE
     }
 
     /**
@@ -296,7 +364,11 @@ class MainActivity : AppCompatActivity() {
             "THUMBS" -> {
                 val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
                 val up = MaterialButton(this).apply {
-                    text = "👍"
+                    icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.round_thumb_up_24)
+                    iconPadding = 0
+                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    insetTop = 0
+                    insetBottom = 0
                     alpha = 0.5f
                     setOnClickListener {
                         thumbsSelected = true
@@ -304,7 +376,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 val down = MaterialButton(this).apply {
-                    text = "👎"
+                    icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.round_thumb_down_24)
+                    iconPadding = 0
+                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    insetTop = 0
+                    insetBottom = 0
                     alpha = 0.5f
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -392,11 +468,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Applies a hardcoded local palette to make the two variants look
-     * visibly different. This is a demo-app-only trick, not something
-     * driven by the SDK or the Portal. Covers the toolbar and every
-     * feedback widget too, not just the card — otherwise switching themes
-     * only half-applies and looks broken.
+     * Applies the app-wide palette (see AppTheme.resolveAppPalette()) to
+     * this screen. This is a demo-app-only trick, not something driven by
+     * the SDK or the Portal. Covers the toolbar and every feedback widget
+     * too, not just the card — otherwise switching themes only
+     * half-applies and looks broken.
      */
     private fun applyTheme(palette: DemoPalette) {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
@@ -410,6 +486,10 @@ class MainActivity : AppCompatActivity() {
         val variantLabel = findViewById<TextView>(R.id.variantLabel)
         val description = findViewById<TextView>(R.id.experimentDescription)
         val generalCardInstructions = findViewById<TextView>(R.id.generalCardInstructions)
+        val metadataFeaturesTitle = findViewById<TextView>(R.id.metadataFeaturesTitle)
+        val metadataFeaturesList = findViewById<LinearLayout>(R.id.metadataFeaturesList)
+        val metadataSelectLabel = findViewById<TextView>(R.id.metadataSelectLabel)
+        val metadataSelectSpinner = findViewById<Spinner>(R.id.metadataSelectSpinner)
         val feedbackPrompt = findViewById<TextView>(R.id.feedbackPrompt)
         val ctaButton = findViewById<MaterialButton>(R.id.ctaButton)
         val submitButton = findViewById<MaterialButton>(R.id.submitFeedbackButton)
@@ -431,6 +511,22 @@ class MainActivity : AppCompatActivity() {
         variantLabel.setTextColor(accent)
         description.setTextColor(textSecondary)
         generalCardInstructions.setTextColor(textSecondary)
+        metadataFeaturesTitle.setTextColor(textPrimary)
+        for (i in 0 until metadataFeaturesList.childCount) {
+            (metadataFeaturesList.getChildAt(i) as? TextView)?.setTextColor(textSecondary)
+        }
+        metadataSelectLabel.setTextColor(textPrimary)
+        // mutate() so re-tinting this drawable doesn't bleed into every
+        // other view still sharing the un-mutated @drawable/spinner_background.
+        // It's a layer-list: layer 0 is the outline shape, the arrow is
+        // looked up by id since it's a separate layered-on drawable.
+        (metadataSelectSpinner.background?.mutate() as? LayerDrawable)?.let { layers ->
+            (layers.getDrawable(0) as? GradientDrawable)?.setStroke(
+                (1 * resources.displayMetrics.density).toInt(),
+                accent,
+            )
+            layers.findDrawableByLayerId(R.id.spinnerArrowLayer)?.setTint(accent)
+        }
         feedbackPrompt.setTextColor(textSecondary)
         ctaButton.backgroundTintList = accentColors
         ctaButton.setTextColor(accentTextOn)
@@ -456,13 +552,21 @@ class MainActivity : AppCompatActivity() {
         ratingBarWidget?.progressTintList = accentColors
         ratingBarWidget?.secondaryProgressTintList = accentColors
         ratingBarWidget?.progressBackgroundTintList = ColorStateList.valueOf(textSecondary)
+        val accentTextOnColors = ColorStateList.valueOf(accentTextOn)
         thumbsUpButton?.backgroundTintList = accentColors
-        thumbsUpButton?.setTextColor(accentTextOn)
+        thumbsUpButton?.iconTint = accentTextOnColors
         thumbsDownButton?.backgroundTintList = accentColors
-        thumbsDownButton?.setTextColor(accentTextOn)
+        thumbsDownButton?.iconTint = accentTextOnColors
         choiceRadioGroup?.let { group ->
             for (i in 0 until group.childCount) {
-                (group.getChildAt(i) as? RadioButton)?.setTextColor(textPrimary)
+                (group.getChildAt(i) as? RadioButton)?.apply {
+                    setTextColor(textPrimary)
+                    // The radio circle itself is a separate tintable
+                    // drawable from the label text — only theming the
+                    // text left the circle stuck on the system default
+                    // color regardless of palette.
+                    buttonTintList = accentColors
+                }
             }
         }
         commentInput?.setTextColor(textPrimary)

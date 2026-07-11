@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Outline + dropdown arrow, layered together. Plain android:background
+     replaces the Spinner's default background outright, which is what
+     silently removed the built-in dropdown arrow when this was first
+     added as a single plain shape — the arrow was baked into that
+     default background drawable. Drawing our own here instead. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/spinner_outline_shape" />
+    <item
+        android:id="@+id/spinnerArrowLayer"
+        android:width="10dp"
+        android:height="6dp"
+        android:gravity="center_vertical|end"
+        android:right="14dp"
+        android:drawable="@drawable/ic_spinner_arrow" />
+</layer-list>

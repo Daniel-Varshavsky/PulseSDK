@@ -10,7 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorPrimary"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:popupTheme="@style/PopupOverlay.PulseSDK" />
 
     <ScrollView
         android:id="@+id/scrollRoot"
@@ -87,6 +88,60 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="16dp"
                             android:text="@string/main_cta_default" />
+
+                        <!-- Driven entirely by the variant's metadata (itemLimit) —
+                             hidden when a variant doesn't set it. -->
+                        <LinearLayout
+                            android:id="@+id/metadataFeaturesContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:layout_marginTop="16dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/metadataFeaturesTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:text="@string/main_features_title" />
+
+                            <LinearLayout
+                                android:id="@+id/metadataFeaturesList"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:layout_marginTop="4dp" />
+
+                        </LinearLayout>
+
+                        <!-- Driven entirely by the variant's metadata (selectOptions,
+                             a comma-separated list) — hidden when a variant doesn't set it. -->
+                        <LinearLayout
+                            android:id="@+id/metadataSelectContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:layout_marginTop="16dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/metadataSelectLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:text="@string/main_select_label" />
+
+                            <Spinner
+                                android:id="@+id/metadataSelectSpinner"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:background="@drawable/spinner_background" />
+
+                        </LinearLayout>
 
                         <TextView
                             android:id="@+id/feedbackPrompt"
