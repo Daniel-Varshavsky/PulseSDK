@@ -5,6 +5,5 @@ internal data class ExperimentResponse(
     val name: String,
     val status: String,
     val feedbackType: String,
-    val trafficSplit: List<TrafficSplitEntry>,
     val variants: List<VariantResponse>,
 )

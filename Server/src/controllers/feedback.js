@@ -69,30 +69,6 @@ export async function submitFeedback(req, res) {
   }
 }
 
-export async function logExposure(req, res) {
-  const { userId, variantId } = req.body
-  if (!userId || !variantId) return res.status(400).json({ error: 'userId and variantId are required' })
-
-  try {
-    const user = await prisma.user.findFirst({ where: { id: userId, appId: req.pulseApp.id } })
-    if (!user) return res.status(404).json({ error: 'User not found' })
-
-    const variant = await prisma.variant.findFirst({ where: { id: variantId, experiment: { appId: req.pulseApp.id } } })
-    if (!variant) return res.status(404).json({ error: 'Variant not found' })
-
-    await prisma.experimentResult.upsert({
-      where: { experimentId_variantId: { experimentId: variant.experimentId, variantId } },
-      update: { responseCount: { increment: 1 }, computedAt: new Date() },
-      create: { experimentId: variant.experimentId, variantId, responseCount: 1 },
-    })
-
-    res.json({ success: true })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to log exposure' })
-  }
-}
-
 export async function getFeedback(req, res) {
   const appId = req.pulseApp.id
   const {

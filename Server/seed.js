@@ -51,10 +51,6 @@ async function main() {
       name: 'Homepage CTA',
       status: 'ACTIVE',
       feedbackType: 'STAR_RATING',
-      trafficSplit: [
-        { name: 'Light Theme', weight: 50 },
-        { name: 'Dark Theme', weight: 50 },
-      ],
       variants: {
         create: [
           { name: 'Light Theme', weight: 50, metadata: { appTheme: 'light' } },
@@ -72,12 +68,6 @@ async function main() {
       name: 'Onboarding Tips',
       status: 'ACTIVE',
       feedbackType: 'THUMBS',
-      trafficSplit: [
-        { name: 'Standard', weight: 25 },
-        { name: '3 Tips', weight: 25 },
-        { name: '5 Tips', weight: 25 },
-        { name: '7 Tips', weight: 25 },
-      ],
       variants: {
         create: [
           { name: 'Standard', weight: 25 },
@@ -101,10 +91,6 @@ async function main() {
       name: 'Navigation Style',
       status: 'ACTIVE',
       feedbackType: 'MULTIPLE_CHOICE',
-      trafficSplit: [
-        { name: 'Bottom Tabs', weight: 50 },
-        { name: 'Side Drawer', weight: 50 },
-      ],
       variants: {
         create: [
           { name: 'Bottom Tabs', weight: 50, choices: bottomTabsChoices, metadata: { selectOptions: 'Compact,Comfortable,Spacious' } },
@@ -122,10 +108,6 @@ async function main() {
       name: 'Search Bar Placement',
       status: 'PAUSED',
       feedbackType: 'STAR_RATING',
-      trafficSplit: [
-        { name: 'Top', weight: 50 },
-        { name: 'Bottom', weight: 50 },
-      ],
       variants: {
         create: [
           { name: 'Top', weight: 50 },
@@ -143,10 +125,6 @@ async function main() {
       name: 'Signup Flow Length',
       status: 'COMPLETED',
       feedbackType: 'THUMBS',
-      trafficSplit: [
-        { name: 'Short', weight: 50 },
-        { name: 'Long', weight: 50 },
-      ],
       variants: {
         create: [
           { name: 'Short', weight: 50 },

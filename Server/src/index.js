@@ -11,7 +11,6 @@ import notificationRoutes from './routes/notifications.js'
 import authRoutes from './routes/auth.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { runTokenCleanup } from './workers/tokenCleanup.js'
-import { runAggregation } from './workers/aggregation.js'
 
 dotenv.config()
 
@@ -32,20 +31,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
-// Run aggregation every 10 minutes
-setInterval(runAggregation, 10 * 60 * 1000)
-
 // Run token cleanup once a day
 setInterval(runTokenCleanup, 24 * 60 * 60 * 1000)
-
-// Delay initial runs to allow DB connection to stabilize
-setTimeout(runAggregation, 5000)
-
-// Run once immediately on startup in development
-if (process.env.NODE_ENV !== 'production') {
-  runAggregation()
-  console.log('Running initial aggregation...')
-}
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {

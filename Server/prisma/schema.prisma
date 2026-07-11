@@ -51,15 +51,12 @@ model Experiment {
   name          String
   status        ExperimentStatus @default(ACTIVE)
   feedbackType  FeedbackType     @default(STAR_RATING)
-  trafficSplit  Json
-  targetVersion String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
   app       App       @relation(fields: [appId], references: [id])
   createdBy Account   @relation(fields: [createdById], references: [id])
   variants  Variant[]
-  results   ExperimentResult[]
 }
 
 model Variant {
@@ -72,7 +69,6 @@ model Variant {
 
   experiment        Experiment         @relation(fields: [experimentId], references: [id])
   feedbackResponses FeedbackResponse[]
-  results           ExperimentResult[]
 }
 
 model User {
@@ -111,20 +107,6 @@ model FeedbackResponse {
 
   user    User     @relation(fields: [userId], references: [id])
   variant Variant? @relation(fields: [variantId], references: [id])
-}
-
-model ExperimentResult {
-  id            String   @id @default(uuid())
-  experimentId  String
-  variantId     String
-  responseCount Int      @default(0)
-  avgRating     Float?
-  computedAt    DateTime @default(now())
-
-  experiment Experiment @relation(fields: [experimentId], references: [id])
-  variant    Variant    @relation(fields: [variantId], references: [id])
-
-  @@unique([experimentId, variantId])
 }
 
 enum ExperimentStatus {

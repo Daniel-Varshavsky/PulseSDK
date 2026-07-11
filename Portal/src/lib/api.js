@@ -4,6 +4,23 @@ const api = axios.create({
   baseURL: 'http://localhost:3000',
 })
 
+// Restore auth headers synchronously at module load, before any component
+// mounts — a React effect runs too late (child effects fire before parent
+// effects), so the first requests on a hard page reload would otherwise go
+// out unauthenticated and 401.
+const storedToken = localStorage.getItem('pulsesdk_token')
+if (storedToken) api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+
+const storedApp = localStorage.getItem('pulsesdk_active_app')
+if (storedApp) {
+  try {
+    const app = JSON.parse(storedApp)
+    if (app?.apiKey) api.defaults.headers.common['x-api-key'] = app.apiKey
+  } catch {
+    localStorage.removeItem('pulsesdk_active_app')
+  }
+}
+
 export function setToken(token) {
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`

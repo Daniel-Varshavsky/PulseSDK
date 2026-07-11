@@ -5,14 +5,14 @@ import prisma from '../lib/prisma.js'
 const VALID_FEEDBACK_TYPES = ['STAR_RATING', 'THUMBS', 'MULTIPLE_CHOICE']
 
 export async function createExperiment(req, res) {
-  const { appId, name, trafficSplit, targetVersion, feedbackType = 'STAR_RATING' } = req.body
+  const { appId, name, variants, feedbackType = 'STAR_RATING' } = req.body
 
-  if (!appId || !name || !trafficSplit) {
-    return res.status(400).json({ error: 'appId, name, and trafficSplit are required' })
+  if (!appId || !name || !variants) {
+    return res.status(400).json({ error: 'appId, name, and variants are required' })
   }
 
-  if (!Array.isArray(trafficSplit) || trafficSplit.reduce((sum, v) => sum + v.weight, 0) !== 100) {
-    return res.status(400).json({ error: 'trafficSplit must be an array of variants whose weights sum to 100' })
+  if (!Array.isArray(variants) || variants.reduce((sum, v) => sum + v.weight, 0) !== 100) {
+    return res.status(400).json({ error: 'variants must be an array whose weights sum to 100' })
   }
 
   if (!VALID_FEEDBACK_TYPES.includes(feedbackType)) {
@@ -31,10 +31,8 @@ export async function createExperiment(req, res) {
         createdById: req.account.id,
         name,
         feedbackType,
-        trafficSplit,
-        targetVersion,
         variants: {
-          create: trafficSplit.map(v => ({
+          create: variants.map(v => ({
             name: v.name,
             weight: v.weight,
             choices: v.choices ?? null,
@@ -42,10 +40,7 @@ export async function createExperiment(req, res) {
           })),
         },
       },
-      include: {
-        variants: true,
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
+      include: { variants: true },
     })
 
     res.status(201).json(experiment)
@@ -75,10 +70,10 @@ export async function getExperiments(req, res) {
 
     const experiments = await prisma.experiment.findMany({
       where,
-      include: {
-        variants: true,
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
+      // No createdBy here — this endpoint is shared by the SDK and every
+      // Portal list view, and neither uses it. ExperimentDetail is the
+      // only consumer, via getExperimentResults below.
+      include: { variants: true },
       orderBy: { createdAt: 'desc' },
       ...(limit && { take: parseInt(limit) }),
       skip: parseInt(offset),
@@ -127,25 +122,8 @@ export async function getExperiments(req, res) {
   }
 }
 
-export async function getExperiment(req, res) {
-  try {
-    const experiment = await prisma.experiment.findUnique({
-      where: { id: req.params.id },
-      include: { variants: true, results: true },
-    })
-
-    if (!experiment) return res.status(404).json({ error: 'Experiment not found' })
-    if (experiment.appId !== req.pulseApp.id) return res.status(403).json({ error: 'Forbidden' })
-
-    res.json(experiment)
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to fetch experiment' })
-  }
-}
-
 export async function updateExperiment(req, res) {
-  const { status, targetVersion } = req.body
+  const { status } = req.body
 
   try {
     const existing = await prisma.experiment.findUnique({ where: { id: req.params.id } })
@@ -160,7 +138,6 @@ export async function updateExperiment(req, res) {
       where: { id: req.params.id },
       data: {
         ...(status && { status }),
-        ...(targetVersion !== undefined && { targetVersion }),
       },
       include: { variants: true },
     })

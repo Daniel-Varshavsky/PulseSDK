@@ -179,7 +179,7 @@ function CreateExperimentModal({ onClose, onCreate }) {
         appId: activeApp.id,
         name,
         feedbackType,
-        trafficSplit: variantsWithMetadata.map(v => ({
+        variants: variantsWithMetadata.map(v => ({
           name: v.name,
           weight: Number(v.weight),
           ...(isMultipleChoice && { choices: v.choices }),
