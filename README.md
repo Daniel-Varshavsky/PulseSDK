@@ -60,15 +60,12 @@ This README covers the essentials.
 
 ## Demo Video
 
-The **Pulse loop** — the cycle the SDK is named after — running end to end,
-against the real app: a user asks for dark mode → the team answers with a
-Light-vs-Dark experiment → users respond to the variants → Dark Theme wins
-and ships as a permanent feature.
-
-**[Watch the full ~2½-minute walkthrough](https://github.com/user-attachments/assets/82150f5d-9ed1-475a-b5f0-8dcfed97e737)**
-(architecture, Portal tour, the two-line Android integration, and the full
-loop above with no cuts) — click through to GitHub's file view to play it.
-Also embedded, full quality, on the
+📺 **[Watch the demo](https://github.com/user-attachments/assets/82150f5d-9ed1-475a-b5f0-8dcfed97e737)**
+— a ~2½-minute tour of the **Pulse loop**, the cycle the SDK is named
+after, running end to end against the real app: a user asks for dark
+mode → the team answers with a Light-vs-Dark experiment → users respond
+to the variants → Dark Theme wins and ships as a permanent feature. Also
+embedded, full quality, on the
 [docs site](https://daniel-varshavsky.github.io/PulseSDK/).
 
 ---
