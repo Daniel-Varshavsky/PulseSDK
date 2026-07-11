@@ -1,0 +1,311 @@
+:root {
+  --bg-base: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --border: #E2E8F0;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  --accent: #0D9488;
+  --accent-hover: #0F766E;
+  --accent-subtle: #F0FDFA;
+  --accent-text: #0F766E;
+  --accent-text-on: #FFFFFF;
+  --accent-border: #99F6E4;
+  --code-bg: #0F172A;
+  --code-text: #E2E8F0;
+  --sidebar-width: 240px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-base: #0B1220;
+    --bg-surface: #111827;
+    --bg-subtle: #1A2436;
+    --border: #263145;
+    --text-primary: #F1F5F9;
+    --text-secondary: #CBD5E1;
+    --text-tertiary: #94A3B8;
+    --accent: #2DD4BF;
+    --accent-hover: #5EEAD4;
+    --accent-subtle: #0F2E2B;
+    --accent-text: #5EEAD4;
+    --accent-text-on: #06231F;
+    --accent-border: #134E4A;
+    --code-bg: #0B1220;
+    --code-text: #E2E8F0;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+a { color: var(--accent-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar .logo {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.1rem;
+}
+
+.sidebar .logo-tag {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-bottom: 1.5rem;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sidebar nav a {
+  display: block;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.sidebar nav a:hover {
+  background: var(--bg-subtle);
+  text-decoration: none;
+}
+
+.sidebar nav a.active {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+.sidebar .section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin: 1.25rem 0 0.35rem 0.65rem;
+}
+
+.sidebar .back-link {
+  display: block;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+/* ── Content ────────────────────────────────────────────── */
+main {
+  flex: 1;
+  min-width: 0;
+  padding: 2.5rem 3rem 5rem;
+  max-width: 900px;
+}
+
+main h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+}
+
+main .subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+main h2 {
+  font-size: 1.4rem;
+  margin: 2.5rem 0 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+main h2:first-of-type { border-top: none; padding-top: 0; }
+
+main h3 {
+  font-size: 1.1rem;
+  margin: 1.75rem 0 0.75rem;
+}
+
+main p { color: var(--text-secondary); }
+
+main code {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.4em;
+  border-radius: 0.35em;
+  font-size: 0.88em;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: var(--accent-text);
+}
+
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 1rem 1.25rem;
+  border-radius: 0.6rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.callout {
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  border-radius: 0.6rem;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  color: var(--accent-text);
+  font-size: 0.92rem;
+}
+
+.callout strong { color: var(--accent-text); }
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-right: 0.4rem;
+}
+
+.badge.get { background: #DBEAFE; color: #1D4ED8; }
+.badge.post { background: #DCFCE7; color: #15803D; }
+.badge.patch { background: #FEF9C3; color: #854D0E; }
+.badge.delete { background: #FEE2E2; color: #B91C1C; }
+.badge.auth-jwt { background: var(--accent-subtle); color: var(--accent-text); }
+.badge.auth-key { background: var(--bg-subtle); color: var(--text-secondary); }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: block;
+  color: var(--text-primary);
+}
+
+.card:hover { border-color: var(--accent-border); text-decoration: none; }
+
+.card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.shot {
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  margin: 0.5rem 0 0.25rem;
+}
+
+.shot-caption {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin: 0 0 1.25rem;
+}
+
+.func-sig {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  margin: 0.5rem 0 0.5rem;
+  color: var(--text-primary);
+  overflow-x: auto;
+}
+
+.video-embed {
+  aspect-ratio: 16/9;
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  margin: 1rem 0 2rem;
+}
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; }
+  main { padding: 1.5rem; max-width: 100%; }
+}

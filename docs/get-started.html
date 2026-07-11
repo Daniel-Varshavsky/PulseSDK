@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Started — PulseSDK Docs</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">PulseSDK</div>
+    <div class="logo-tag">Documentation</div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="get-started.html" class="active">Get Started</a>
+      <a href="usage.html">Usage</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <a class="back-link" href="https://github.com/daniel-varshavsky/pulsesdk">← Back to GitHub</a>
+  </aside>
+
+  <main>
+    <h1>Get Started</h1>
+    <p class="subtitle">Run the server and portal locally, then add the SDK to an Android app.</p>
+
+    <h2>Prerequisites</h2>
+    <ul>
+      <li>Node.js 20+ and npm</li>
+      <li>PostgreSQL (local install or a hosted instance)</li>
+      <li>Android Studio (recent stable) for the SDK / demo app</li>
+    </ul>
+
+    <h2>1. Server</h2>
+    <pre><code>cd Server
+npm install
+
+# create a .env with your database connection
+echo 'DATABASE_URL="postgresql://user:password@localhost:5432/pulsesdk_dev"' > .env
+
+npx prisma migrate deploy   # apply the schema
+node seed.js                # optional — creates demo accounts, an app, and sample experiments
+npm run dev                 # starts on http://localhost:3000</code></pre>
+
+    <p>The seed script prints a demo app's API key and two login accounts
+    (<code>alice@example.com</code> / <code>bob@example.com</code>, password
+    <code>password123</code>) — useful for exploring the Portal without
+    registering from scratch.</p>
+
+    <h2>2. Developer Portal</h2>
+    <pre><code>cd Portal
+npm install
+npm run dev   # starts on http://localhost:5173</code></pre>
+
+    <p>Open the Portal, register an account (or log in with a seeded one),
+    and create an app — this generates the API key your Android app will use.</p>
+
+    <img class="shot" src="assets/screenshots/01-login.png" alt="Portal login screen">
+    <p class="shot-caption">The Portal's login screen — register a new account or log in with a seeded demo account.</p>
+
+    <h2>3. Android SDK</h2>
+    <p>The SDK lives in the <code>pulsesdk</code> Gradle module. Add it as a
+    dependency of your app module (already wired up for the included
+    <code>app</code> demo module):</p>
+
+    <pre><code>// app/build.gradle.kts
+dependencies {
+    implementation(project(":pulsesdk"))
+}</code></pre>
+
+    <p>Then point it at your app's API key — either declaratively (SDK
+    auto-initializes on app start) or manually:</p>
+
+    <pre><code>&lt;!-- AndroidManifest.xml --&gt;
+&lt;application&gt;
+    &lt;meta-data
+        android:name="com.pulsesdk.API_KEY"
+        android:value="YOUR_APP_API_KEY" /&gt;
+&lt;/application&gt;</code></pre>
+
+    <pre><code>// or call it yourself, e.g. in Application.onCreate()
+PulseSDK.init(context, apiKey = "YOUR_APP_API_KEY")
+
+// pointing at a non-default server (e.g. your own deployment)
+PulseSDK.init(context, apiKey = "YOUR_APP_API_KEY", serverUrl = "https://api.yourdomain.com")</code></pre>
+
+    <div class="callout">
+      <strong>Running everything locally on a physical device or emulator?</strong>
+      Use your machine's LAN IP (or <code>10.0.2.2</code> for the Android
+      emulator talking to your host machine) as the <code>serverUrl</code>,
+      not <code>localhost</code> — <code>localhost</code> on the device means
+      the device itself, not your dev machine.
+    </div>
+
+    <h2>4. Create your first experiment</h2>
+    <p>In the Portal, go to <strong>Experiments → New Experiment</strong>, name
+    it, add two or more variants with weights summing to 100, and pick a
+    feedback type.</p>
+
+    <img class="shot" src="assets/screenshots/04-new-experiment-modal.png" alt="Creating a new experiment in the Portal">
+    <p class="shot-caption">Creating an experiment — variants, weights, and a feedback type.</p>
+
+    <p>That's it — see <a href="usage.html">Usage</a> for how to read the
+    variant and submit feedback from the SDK.</p>
+  </main>
+</div>
+
+</body>
+</html>

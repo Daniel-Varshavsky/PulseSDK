@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Usage — PulseSDK Docs</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">PulseSDK</div>
+    <div class="logo-tag">Documentation</div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="get-started.html">Get Started</a>
+      <a href="usage.html" class="active">Usage</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <a class="back-link" href="https://github.com/daniel-varshavsky/pulsesdk">← Back to GitHub</a>
+  </aside>
+
+  <main>
+    <h1>Usage</h1>
+    <p class="subtitle">The core SDK workflow, and how to manage experiments from the Portal.</p>
+
+    <h2>Identify your user</h2>
+    <p>Call this once you know who the user is (e.g. after login) so their
+    variant assignment and feedback are tied to a stable identity instead of
+    just the device:</p>
+    <pre><code>PulseSDK.identify(externalUserId = "user_123")
+
+// on logout
+PulseSDK.clearUser()</code></pre>
+    <p>Without <code>identify()</code>, the SDK still works — it registers an
+    anonymous device-scoped user automatically on <code>init()</code>.</p>
+
+    <h2>Read a variant</h2>
+    <pre><code>val variant = PulseSDK.getVariant("Homepage CTA") ?: return
+
+when (variant.variantName) {
+    "Light Theme" -> applyLightTheme()
+    "Dark Theme" -> applyDarkTheme()
+}
+
+// arbitrary per-variant config, set from the Portal, read here without a redeploy
+val itemLimit = variant.metadata?.get("itemLimit")?.toIntOrNull() ?: 10</code></pre>
+    <p>Assignment is deterministic per <code>(user, experiment)</code> — the
+    same user always gets the same variant, cached locally after the first
+    lookup. Returns <code>null</code> if the experiment doesn't exist or isn't
+    <code>ACTIVE</code>.</p>
+
+    <p>Need every active experiment at once, instead of naming them one by
+    one?</p>
+    <pre><code>val variants = PulseSDK.getActiveVariants() // List&lt;VariantResult&gt;</code></pre>
+
+    <h3>QA: preview a specific variant</h3>
+    <pre><code>PulseSDK.overrideVariant("Homepage CTA", variantId = "35ec81b3-...")
+// ...preview it...
+PulseSDK.clearVariantOverride("Homepage CTA")</code></pre>
+    <p>This is a local-only override for testing — it doesn't change the real
+    assignment server-side, and shouldn't run in production code paths.</p>
+
+    <h2>Submit feedback</h2>
+    <p>All four feedback types take the variant ID you got from
+    <code>getVariant()</code>. Pass <code>variantId = null</code> to
+    <code>submitText</code> for feedback that isn't tied to any experiment.</p>
+    <pre><code>PulseSDK.submitStarRating(variant.variantId, rating = 5, comment = "Love it!")
+PulseSDK.submitThumbs(variant.variantId, positive = true)
+PulseSDK.submitMultipleChoice(variant.variantId, index = 2)
+PulseSDK.submitText("Would love a dark mode toggle", screenId = "settings")</code></pre>
+    <p>Feedback is written to a local queue immediately and uploaded in the
+    background as soon as there's a network connection — calling any
+    <code>submit*</code> function never blocks on the network.</p>
+
+    <h2>Managing experiments in the Portal</h2>
+
+    <h3>Apps and collaborators</h3>
+    <p>An app is the unit everything else belongs to — one API key, one set
+    of experiments, one set of users. Invite teammates by email from
+    <strong>Settings</strong>; they need an account (or can register one on
+    the spot) to accept.</p>
+    <img class="shot" src="assets/screenshots/07-team.png" alt="Team page showing app collaborators">
+    <p class="shot-caption">Team members on an app, with their role.</p>
+
+    <h3>Experiments and results</h3>
+    <img class="shot" src="assets/screenshots/03-experiments.png" alt="Experiments list in the Portal">
+    <p class="shot-caption">Every experiment for the active app, with status, variant count, and traffic split.</p>
+    <p>Open any experiment to see live results — response counts, average
+    star rating, thumbs breakdown, or multiple-choice distribution, per
+    variant — and every individual feedback response underneath, filterable
+    by variant.</p>
+
+    <h3>Notifications</h3>
+    <img class="shot" src="assets/screenshots/06-notifications.png" alt="Sending a push notification from the Portal">
+    <p class="shot-caption">Sending a push notification to an app's users, straight from the Portal.</p>
+
+    <div class="callout">
+      Full function-by-function and endpoint-by-endpoint reference:
+      <a href="api-reference.html">API Reference</a>.
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

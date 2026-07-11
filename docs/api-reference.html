@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Reference — PulseSDK Docs</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">PulseSDK</div>
+    <div class="logo-tag">Documentation</div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="get-started.html">Get Started</a>
+      <a href="usage.html">Usage</a>
+      <a href="api-reference.html" class="active">API Reference</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <div class="section-label">On this page</div>
+    <nav>
+      <a href="#sdk-public">SDK — public functions</a>
+      <a href="#sdk-private">SDK — internal functions</a>
+      <a href="#endpoints-sdk">Endpoints — SDK-facing</a>
+      <a href="#endpoints-portal">Endpoints — Portal-facing</a>
+    </nav>
+    <a class="back-link" href="https://github.com/daniel-varshavsky/pulsesdk">← Back to GitHub</a>
+  </aside>
+
+  <main>
+    <h1>API Reference</h1>
+    <p class="subtitle">Every public SDK function, and every server endpoint.</p>
+
+    <h2 id="sdk-public">SDK — public functions</h2>
+    <p>Everything below lives on the <code>PulseSDK</code> object
+    (<code>com.pulsesdk.PulseSDK</code>) and can be called from anywhere in
+    your app after <code>init()</code>.</p>
+
+    <div class="func-sig">fun init(context: Context, apiKey: String, serverUrl: String? = null)</div>
+    <p>Initializes the SDK. Called automatically on app start if the API key
+    is declared in <code>AndroidManifest.xml</code>; call manually otherwise.
+    A no-op if already initialized.</p>
+
+    <div class="func-sig">fun identify(externalUserId: String)</div>
+    <p>Links the SDK's user to your own user identity. Call after login.</p>
+
+    <div class="func-sig">fun clearUser()</div>
+    <p>Unlinks the current user identity. Call on logout.</p>
+
+    <div class="func-sig">fun refreshFcmToken(token: String)</div>
+    <p>Updates the stored push notification token. Call from your
+    <code>FirebaseMessagingService.onNewToken()</code>.</p>
+
+    <div class="func-sig">fun setTestFcmToken(token: String)</div>
+    <p>Sets a fake FCM token for development on emulators where real FCM
+    tokens aren't available. <strong>Development only.</strong></p>
+
+    <div class="func-sig">fun getVariant(experimentName: String): VariantResult?</div>
+    <p>Returns the variant this user is assigned to for the named experiment.
+    Deterministic and cached — the same user always gets the same result.
+    Returns <code>null</code> if the experiment doesn't exist or isn't active.</p>
+
+    <div class="func-sig">fun getActiveVariants(): List&lt;VariantResult&gt;</div>
+    <p>Returns the assigned variant for every currently active experiment, in
+    one call — useful for a screen that shouldn't need to hardcode experiment
+    names.</p>
+
+    <div class="func-sig">fun getExperimentVariants(experimentName: String): List&lt;ExperimentVariantSummary&gt;?</div>
+    <p>Lists every variant of an experiment, regardless of assignment. Mainly
+    for building QA tooling (e.g. a "preview other variants" switcher) on top
+    of <code>overrideVariant</code>.</p>
+
+    <div class="func-sig">fun overrideVariant(experimentName: String, variantId: String)</div>
+    <p>Forces the local variant assignment to a specific variant for testing.
+    Client-side only — doesn't affect real assignment. Not for production
+    code paths.</p>
+
+    <div class="func-sig">fun clearVariantOverride(experimentName: String)</div>
+    <p>Clears an <code>overrideVariant</code> call.</p>
+
+    <div class="func-sig">fun submitStarRating(variantId: String, rating: Int, comment: String? = null, screenId: String? = null)</div>
+    <p>Submits a 1–5 star rating for a variant.</p>
+
+    <div class="func-sig">fun submitThumbs(variantId: String, positive: Boolean, comment: String? = null, screenId: String? = null)</div>
+    <p>Submits a thumbs up/down response for a variant.</p>
+
+    <div class="func-sig">fun submitMultipleChoice(variantId: String, index: Int, comment: String? = null, screenId: String? = null)</div>
+    <p>Submits a multiple-choice response. <code>index</code> is 0-based into
+    the variant's <code>choices</code>.</p>
+
+    <div class="func-sig">fun submitText(text: String, variantId: String? = null, screenId: String? = null)</div>
+    <p>Submits open-ended text feedback. Pass <code>variantId = null</code>
+    for general feedback not tied to any experiment.</p>
+
+    <h2 id="sdk-private">SDK — internal functions</h2>
+    <p>Not part of the public API (package-private or <code>private</code> in
+    <code>PulseSDK.kt</code>) — listed here only so the SDK's internals aren't
+    a black box.</p>
+    <table>
+      <tr><th>Function</th><th>Purpose</th></tr>
+      <tr><td><code>registerDevice()</code></td><td>Registers the device's FCM token on init, before any user identity is known.</td></tr>
+      <tr><td><code>fetchActiveExperiments()</code></td><td>Fetches and caches the active experiment list once per process.</td></tr>
+      <tr><td><code>assignVariant(userId, experiment)</code></td><td>The deterministic hash-based assignment used by <code>getVariant</code>/<code>getActiveVariants</code>.</td></tr>
+      <tr><td><code>enqueue(...)</code></td><td>Writes a feedback event to the local Room queue; backs every <code>submit*</code> call.</td></tr>
+      <tr><td><code>scheduleUpload()</code></td><td>Enqueues the WorkManager job that flushes the local feedback queue once a network is available.</td></tr>
+      <tr><td><code>checkInitialized()</code></td><td>Guard called at the top of every public function — throws if <code>init()</code> hasn't run.</td></tr>
+    </table>
+
+    <h2 id="endpoints-sdk">Endpoints — SDK-facing (API key auth)</h2>
+    <p>Authenticated with an app's API key in the <code>x-api-key</code>
+    header. These are the endpoints the Android SDK itself calls.</p>
+    <table>
+      <tr><th>Endpoint</th><th>Purpose</th></tr>
+      <tr><td><span class="badge post">POST</span><code>/devices/register</code></td><td>Register a device's FCM token, get back a <code>userId</code></td></tr>
+      <tr><td><span class="badge post">POST</span><code>/devices/identify</code></td><td>Link a device to an <code>externalUserId</code></td></tr>
+      <tr><td><span class="badge post">POST</span><code>/devices/clear</code></td><td>Unlink a device from its user</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/devices/refresh-token</code></td><td>Update a device's FCM token</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments</code></td><td>List active experiments (with variants + live results)</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/feedback</code></td><td>Submit a feedback response</td></tr>
+    </table>
+
+    <h2 id="endpoints-portal">Endpoints — Portal-facing</h2>
+    <p>A mix of JWT (Bearer token, account-scoped) and API-key auth — the
+    Portal uses whichever an action needs.</p>
+    <table>
+      <tr><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr>
+      <tr><td><span class="badge post">POST</span><code>/auth/register</code></td><td>—</td><td>Create an account</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/auth/login</code></td><td>—</td><td>Log in, get a JWT</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/auth/google</code></td><td>—</td><td>Log in with Google</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/auth/me</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Current account info</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/apps</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Create an app</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/apps/my</code></td><td><span class="badge auth-jwt">JWT</span></td><td>List apps you're a member of</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/apps/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>App details</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/apps/:id/regenerate-key</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Rotate an app's API key</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/apps/:id/members</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Invite a collaborator by email</td></tr>
+      <tr><td><span class="badge delete">DELETE</span><code>/apps/:id/members/:memberId</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Remove a collaborator</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/apps/stats</code></td><td><span class="badge auth-key">API key</span></td><td>Usage stats for the current app</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/experiments</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Create an experiment</td></tr>
+      <tr><td><span class="badge patch">PATCH</span><code>/experiments/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Update an experiment's status</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments/:id/results</code></td><td><span class="badge auth-key">API key</span></td><td>Results + creator info for one experiment</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments/:id/aggregate</code></td><td><span class="badge auth-key">API key</span></td><td>Full per-variant breakdown (star/thumbs/choice)</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/feedback</code></td><td><span class="badge auth-key">API key</span></td><td>Paginated, filterable raw feedback responses</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/notifications/send</code></td><td><span class="badge auth-key">API key</span></td><td>Send a push notification to an app's users</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/notifications/audience</code></td><td><span class="badge auth-key">API key</span></td><td>Count of reachable devices</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/notifications/status</code></td><td><span class="badge auth-key">API key</span></td><td>Delivery status of a recent send</td></tr>
+    </table>
+
+    <div class="callout">
+      Request/response JSON shapes for the most-used endpoints:
+      <a href="examples.html">Examples</a>.
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

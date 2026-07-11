@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Examples — PulseSDK Docs</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">PulseSDK</div>
+    <div class="logo-tag">Documentation</div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="get-started.html">Get Started</a>
+      <a href="usage.html">Usage</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="examples.html" class="active">Examples</a>
+    </nav>
+    <a class="back-link" href="https://github.com/daniel-varshavsky/pulsesdk">← Back to GitHub</a>
+  </aside>
+
+  <main>
+    <h1>Examples</h1>
+    <p class="subtitle">End-to-end code samples and JSON request/response shapes.</p>
+
+    <h2>Example 1 — an A/B tested button with star-rating feedback</h2>
+    <pre><code>class HomeActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_home)
+
+        val ctaButton = findViewById&lt;Button&gt;(R.id.ctaButton)
+        val variant = PulseSDK.getVariant("Homepage CTA")
+
+        when (variant?.variantName) {
+            "Light Theme" -&gt; ctaButton.setBackgroundColor(Color.WHITE)
+            "Dark Theme"  -&gt; ctaButton.setBackgroundColor(Color.BLACK)
+            else          -&gt; { /* experiment not running — default styling */ }
+        }
+
+        ctaButton.setOnClickListener {
+            showRatingDialog { rating ->
+                variant?.let {
+                    PulseSDK.submitStarRating(it.variantId, rating, screenId = "home")
+                }
+            }
+        }
+    }
+}</code></pre>
+
+    <h2>Example 2 — general feedback form (not tied to an experiment)</h2>
+    <pre><code>submitFeedbackButton.setOnClickListener {
+    val text = feedbackInput.text.toString()
+    if (text.isNotBlank()) {
+        PulseSDK.submitText(text, screenId = "feedback-screen")
+        Toast.makeText(this, "Thanks for the feedback!", Toast.LENGTH_SHORT).show()
+    }
+}</code></pre>
+
+    <h2>Example 3 — multiple choice + metadata-driven UI</h2>
+    <pre><code>val variant = PulseSDK.getVariant("Navigation Style") ?: return
+val choices = variant.choices ?: emptyList()   // e.g. ["Very clear", "Somewhat clear", ...]
+
+choiceGroup.removeAllViews()
+choices.forEachIndexed { index, label ->
+    val radio = RadioButton(this).apply { text = label }
+    radio.setOnClickListener {
+        PulseSDK.submitMultipleChoice(variant.variantId, index)
+    }
+    choiceGroup.addView(radio)
+}</code></pre>
+
+    <h2>Example 4 — sending a push notification (Portal or direct API call)</h2>
+    <p>From the Portal: <strong>Notifications → compose → Send</strong>. The
+    same action as a raw request:</p>
+    <pre><code>POST /notifications/send
+x-api-key: 172bc71f-1cc4-4192-ac26-44cf97981b7e
+Content-Type: application/json
+
+{
+  "title": "New feature just shipped",
+  "body": "Check out the redesigned homepage — tell us what you think!"
+}</code></pre>
+
+    <h2>JSON shapes</h2>
+
+    <h3>Experiment (as the SDK sees it) — <code>GET /experiments</code></h3>
+    <pre><code>[
+  {
+    "id": "91884159-6bfc-46e6-b724-b3208d7e140e",
+    "appId": "8377ced1-314d-407e-8f24-bf21a0c7d474",
+    "name": "Homepage CTA",
+    "status": "ACTIVE",
+    "feedbackType": "STAR_RATING",
+    "variants": [
+      {
+        "id": "35ec81b3-7d76-46a1-ae25-3afa9d6e6332",
+        "name": "Light Theme",
+        "weight": 50,
+        "choices": null,
+        "metadata": { "appTheme": "light" }
+      },
+      {
+        "id": "27ae6fa6-415c-4d8c-a25b-7a34c9a0bdee",
+        "name": "Dark Theme",
+        "weight": 50,
+        "choices": null,
+        "metadata": { "appTheme": "dark" }
+      }
+    ]
+  }
+]</code></pre>
+
+    <h3>Submitting feedback — <code>POST /feedback</code></h3>
+    <pre><code>// request
+{
+  "userId": "0e2e2b4e-06ea-4721-8111-afb9bb1c91cc",
+  "variantId": "35ec81b3-7d76-46a1-ae25-3afa9d6e6332",
+  "type": "STAR_RATING",
+  "value": 5,
+  "comment": "Great!",
+  "screenId": "home",
+  "appVersion": "1.0.0"
+}
+
+// response — 201 Created
+{
+  "id": "4b9776bb-cc55-4461-93fd-5b9502c2fbaa",
+  "userId": "0e2e2b4e-06ea-4721-8111-afb9bb1c91cc",
+  "variantId": "35ec81b3-7d76-46a1-ae25-3afa9d6e6332",
+  "type": "STAR_RATING",
+  "value": 5,
+  "comment": "Great!",
+  "screenId": "home",
+  "appVersion": "1.0.0",
+  "createdAt": "2026-07-11T18:13:50.165Z"
+}</code></pre>
+
+    <h3>Live aggregate results — <code>GET /experiments/:id/aggregate</code></h3>
+    <pre><code>{
+  "experimentId": "91884159-6bfc-46e6-b724-b3208d7e140e",
+  "experimentName": "Homepage CTA",
+  "aggregates": [
+    {
+      "variantId": "35ec81b3-7d76-46a1-ae25-3afa9d6e6332",
+      "variantName": "Light Theme",
+      "responseCount": 5,
+      "starRating": { "avgRating": 3.8, "count": 5 },
+      "thumbs": { "positive": 0, "negative": 0, "positivePct": null, "count": 0 },
+      "multipleChoice": { "choices": [], "count": 0 }
+    }
+  ]
+}</code></pre>
+
+    <div class="callout">
+      Full endpoint list with auth requirements:
+      <a href="api-reference.html">API Reference</a>.
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

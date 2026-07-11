@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PulseSDK Docs</title>
+<meta name="description" content="Documentation for PulseSDK — in-app feedback and A/B testing for Android.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">PulseSDK</div>
+    <div class="logo-tag">Documentation</div>
+    <nav>
+      <a href="index.html" class="active">Overview</a>
+      <a href="get-started.html">Get Started</a>
+      <a href="usage.html">Usage</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <a class="back-link" href="https://github.com/daniel-varshavsky/pulsesdk">← Back to GitHub</a>
+  </aside>
+
+  <main>
+    <h1>PulseSDK</h1>
+    <p class="subtitle">In-app feedback and A/B testing for Android — one SDK, one dashboard.</p>
+
+    <p>
+      PulseSDK is made of three pieces that all talk to the same server: an
+      <strong>Android SDK</strong> your app embeds, a <strong>Developer Portal</strong>
+      where your team creates experiments and reads results, and the
+      <strong>server</strong> that ties them together. You define an experiment and
+      its feedback prompt in the Portal; the SDK assigns each user a variant
+      deterministically and collects their feedback; the Portal shows you the
+      results live.
+    </p>
+
+    <div class="callout">
+      <strong>New here?</strong> Start with <a href="get-started.html">Get Started</a>
+      to install the SDK and run the Server + Portal locally, then
+      <a href="usage.html">Usage</a> for the core API walkthrough.
+    </div>
+
+    <h2>Where to go</h2>
+    <div class="card-grid">
+      <a class="card" href="get-started.html">
+        <h3>Get Started →</h3>
+        <p>Install the SDK, run the server and portal, create your first app.</p>
+      </a>
+      <a class="card" href="usage.html">
+        <h3>Usage →</h3>
+        <p>Assign variants, collect feedback, manage experiments from the Portal.</p>
+      </a>
+      <a class="card" href="api-reference.html">
+        <h3>API Reference →</h3>
+        <p>Every public SDK function and every server endpoint, with request/response shapes.</p>
+      </a>
+      <a class="card" href="examples.html">
+        <h3>Examples →</h3>
+        <p>End-to-end code samples: an A/B tested screen, a feedback form, a notification blast.</p>
+      </a>
+    </div>
+
+    <h2>Architecture</h2>
+    <p>The SDK only ever talks to the server's API-key–protected endpoints. The
+    Portal uses a JWT for account actions (creating apps, inviting teammates)
+    and the app's API key for anything the SDK could also read. The server is
+    the only thing that touches the database.</p>
+
+    <img class="shot" src="assets/screenshots/05-experiment-detail.png" alt="Experiment detail page showing live results">
+    <p class="shot-caption">Live results on an experiment's detail page — computed on request, not by a background job.</p>
+
+    <h2>Demo Video</h2>
+    <div class="video-embed">Video coming soon — will be embedded here.</div>
+
+    <h2>Project layout</h2>
+    <pre><code>PulseSDK/
+├── Android/
+│   ├── pulsesdk/   # the SDK library module
+│   └── app/        # demo app that consumes it
+├── Server/         # Express + Prisma REST API
+├── Portal/         # React developer dashboard
+└── docs/           # this site</code></pre>
+  </main>
+</div>
+
+</body>
+</html>
