@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.pulsesdk.PulseSDK
+import com.pulsesdk.demo.util.DemoSession
 
 class LoginActivity : AppCompatActivity() {
 

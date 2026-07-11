@@ -26,7 +26,7 @@ async function main() {
   // ── App ───────────────────────────────────────────────────────────
   const app = await prisma.app.create({
     data: {
-      name: 'MixTape',
+      name: 'Demo App',
       members: {
         create: [
           { accountId: alice.id, role: 'OWNER' },
@@ -36,23 +36,29 @@ async function main() {
     },
   })
 
-  console.log(`Created app: MixTape (apiKey: ${app.apiKey})`)
+  console.log(`Created app: Demo App (apiKey: ${app.apiKey})`)
 
   // ── Experiments ───────────────────────────────────────────────────
+  // Demonstrates every metadata convention the demo app understands:
+  // appTheme (app-wide light/dark), itemLimit (the "Suggested for you"
+  // list), and selectOptions (the metadata-driven dropdown). See
+  // Android/app/.../demo/DemoTheme.kt and MainActivity.kt.
+
   const exp1 = await prisma.experiment.create({
     data: {
       appId: app.id,
       createdById: alice.id,
-      name: 'Playlist Sort UI',
+      name: 'Homepage CTA',
       status: 'ACTIVE',
+      feedbackType: 'STAR_RATING',
       trafficSplit: [
-        { name: 'Variant A', weight: 50 },
-        { name: 'Variant B', weight: 50 },
+        { name: 'Light Theme', weight: 50 },
+        { name: 'Dark Theme', weight: 50 },
       ],
       variants: {
         create: [
-          { name: 'Variant A', weight: 50 },
-          { name: 'Variant B', weight: 50 },
+          { name: 'Light Theme', weight: 50, metadata: { appTheme: 'light' } },
+          { name: 'Dark Theme', weight: 50, metadata: { appTheme: 'dark' } },
         ],
       },
     },
@@ -63,71 +69,100 @@ async function main() {
     data: {
       appId: app.id,
       createdById: bob.id,
-      name: 'Now Playing Screen Layout',
+      name: 'Onboarding Tips',
       status: 'ACTIVE',
+      feedbackType: 'THUMBS',
       trafficSplit: [
-        { name: 'Classic', weight: 50 },
-        { name: 'Minimal', weight: 50 },
+        { name: 'Standard', weight: 25 },
+        { name: '3 Tips', weight: 25 },
+        { name: '5 Tips', weight: 25 },
+        { name: '7 Tips', weight: 25 },
       ],
       variants: {
         create: [
-          { name: 'Classic', weight: 50 },
-          { name: 'Minimal', weight: 50 },
+          { name: 'Standard', weight: 25 },
+          { name: '3 Tips', weight: 25, metadata: { itemLimit: '3' } },
+          { name: '5 Tips', weight: 25, metadata: { itemLimit: '5' } },
+          { name: '7 Tips', weight: 25, metadata: { itemLimit: '7' } },
         ],
       },
     },
     include: { variants: true },
   })
 
+  // Each variant gets its own choices/selectOptions — not shared — to
+  // show these are genuinely per-variant, not experiment-wide, config.
+  const bottomTabsChoices = ['Very clear', 'Somewhat clear', 'A bit confusing', 'Very confusing']
+  const sideDrawerChoices = ['Easy to find', 'Took a moment', 'Hard to find', "Couldn't find it"]
   const exp3 = await prisma.experiment.create({
     data: {
       appId: app.id,
       createdById: alice.id,
-      name: 'Shuffle Button Placement',
-      status: 'COMPLETED',
+      name: 'Navigation Style',
+      status: 'ACTIVE',
+      feedbackType: 'MULTIPLE_CHOICE',
       trafficSplit: [
-        { name: 'Top Bar', weight: 50 },
-        { name: 'Bottom Bar', weight: 50 },
+        { name: 'Bottom Tabs', weight: 50 },
+        { name: 'Side Drawer', weight: 50 },
       ],
       variants: {
         create: [
-          { name: 'Top Bar', weight: 50 },
-          { name: 'Bottom Bar', weight: 50 },
+          { name: 'Bottom Tabs', weight: 50, choices: bottomTabsChoices, metadata: { selectOptions: 'Compact,Comfortable,Spacious' } },
+          { name: 'Side Drawer', weight: 50, choices: sideDrawerChoices, metadata: { selectOptions: 'Icons Only,Icons + Labels,Labels Only' } },
         ],
       },
     },
     include: { variants: true },
   })
 
-  // Multiple choice experiment
-  const sortChoices = ['By date added', 'By title A-Z', 'By artist', 'By duration']
   const exp4 = await prisma.experiment.create({
     data: {
       appId: app.id,
-      createdById: alice.id,
-      name: 'Default Sort Preference',
-      status: 'ACTIVE',
+      createdById: bob.id,
+      name: 'Search Bar Placement',
+      status: 'PAUSED',
+      feedbackType: 'STAR_RATING',
       trafficSplit: [
-        { name: 'Variant A', weight: 50 },
-        { name: 'Variant B', weight: 50 },
+        { name: 'Top', weight: 50 },
+        { name: 'Bottom', weight: 50 },
       ],
       variants: {
         create: [
-          { name: 'Variant A', weight: 50, choices: sortChoices },
-          { name: 'Variant B', weight: 50, choices: sortChoices },
+          { name: 'Top', weight: 50 },
+          { name: 'Bottom', weight: 50 },
         ],
       },
     },
     include: { variants: true },
   })
 
-  console.log('Created 4 experiments')
+  const exp5 = await prisma.experiment.create({
+    data: {
+      appId: app.id,
+      createdById: alice.id,
+      name: 'Signup Flow Length',
+      status: 'COMPLETED',
+      feedbackType: 'THUMBS',
+      trafficSplit: [
+        { name: 'Short', weight: 50 },
+        { name: 'Long', weight: 50 },
+      ],
+      variants: {
+        create: [
+          { name: 'Short', weight: 50 },
+          { name: 'Long', weight: 50 },
+        ],
+      },
+    },
+    include: { variants: true },
+  })
+
+  console.log('Created 5 experiments (3 active, 1 paused, 1 completed)')
 
   // ── App Users ─────────────────────────────────────────────────────
   const userNames = [
-    'jordan_42', 'maya_music', 'thelastdj', 'neon_beats',
-    'cassette_kid', 'vinyl_vibes', 'bassline_bob', 'echo_chamber',
-    'rhythm_rex', 'lo_fi_luna',
+    'alex_92', 'sam_dev', 'jamie_k', 'taylor_r', 'morgan_lee',
+    'casey_w', 'riley_p', 'drew_n', 'jesse_t', 'avery_m',
   ]
 
   const appUsers = await Promise.all(
@@ -178,19 +213,19 @@ async function main() {
     return comments[Math.floor(Math.random() * comments.length)]
   }
 
-  // ── Feedback: Playlist Sort UI (STAR_RATING + TEXT) ───────────────
-  const exp1VariantA = exp1.variants[0]
-  const exp1VariantB = exp1.variants[1]
+  // ── Feedback: Homepage CTA (STAR_RATING) ──────────────────────────
+  const exp1Light = exp1.variants[0]
+  const exp1Dark = exp1.variants[1]
 
   for (let i = 0; i < 5; i++) {
     await prisma.feedbackResponse.create({
       data: {
         userId: appUsers[i].id,
-        variantId: exp1VariantA.id,
+        variantId: exp1Light.id,
         type: 'STAR_RATING',
         value: randomStarRating(1),
         comment: randomComment(),
-        screenId: 'playlist-screen',
+        screenId: 'main-screen',
         appVersion: '1.0.0',
       },
     })
@@ -200,161 +235,105 @@ async function main() {
     await prisma.feedbackResponse.create({
       data: {
         userId: appUsers[i].id,
-        variantId: exp1VariantB.id,
+        variantId: exp1Dark.id,
         type: 'STAR_RATING',
         value: randomStarRating(-1),
         comment: randomComment(),
-        screenId: 'playlist-screen',
+        screenId: 'main-screen',
         appVersion: '1.0.0',
       },
     })
   }
 
-  const textResponses = [
-    'I love the new sorting options, especially sort by recently added.',
-    'Would be great if I could sort by BPM for workout playlists.',
-    'The drag to reorder is a bit finicky on smaller screens.',
-  ]
-  for (let i = 0; i < 3; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp1VariantA.id,
-        type: 'TEXT',
-        value: textResponses[i],
-        screenId: 'playlist-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
+  console.log('Created feedback for Homepage CTA')
 
-  console.log('Created feedback for Playlist Sort UI')
-
-  // ── Feedback: Now Playing Screen Layout (THUMBS) ──────────────────
-  const exp2Classic = exp2.variants[0]
-  const exp2Minimal = exp2.variants[1]
-
-  for (let i = 0; i < 5; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp2Classic.id,
-        type: 'THUMBS',
-        value: i < 4,
-        comment: i === 4 ? 'Too much going on visually.' : randomComment(),
-        screenId: 'now-playing-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  for (let i = 5; i < 10; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp2Minimal.id,
-        type: 'THUMBS',
-        value: i < 8,
-        comment: i >= 8 ? 'Feels a bit bare, I miss the album art.' : randomComment(),
-        screenId: 'now-playing-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  console.log('Created feedback for Now Playing Screen Layout')
-
-  // ── Feedback: Shuffle Button Placement (STAR_RATING, completed) ───
-  const exp3TopBar = exp3.variants[0]
-  const exp3BottomBar = exp3.variants[1]
-
-  for (let i = 0; i < 5; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp3TopBar.id,
-        type: 'STAR_RATING',
-        value: randomStarRating(),
-        comment: randomComment(),
-        screenId: 'player-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  for (let i = 5; i < 10; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp3BottomBar.id,
-        type: 'STAR_RATING',
-        value: randomStarRating(1),
-        comment: randomComment(),
-        screenId: 'player-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  console.log('Created feedback for Shuffle Button Placement')
-
-  // ── Feedback: Default Sort Preference (MULTIPLE_CHOICE) ──────────
-  const exp4VariantA = exp4.variants[0]
-  const exp4VariantB = exp4.variants[1]
-
-  // Variant A: users prefer "By date added" and "By title A-Z"
-  const exp4AChoices = [0, 0, 1, 0, 2, 1, 0, 3, 1, 0]
-  for (let i = 0; i < 5; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp4VariantA.id,
-        type: 'MULTIPLE_CHOICE',
-        value: exp4AChoices[i],
-        screenId: 'playlist-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  // Variant B: users more spread out, prefer "By artist"
-  const exp4BChoices = [2, 1, 2, 3, 2, 0, 2, 1, 2, 3]
-  for (let i = 5; i < 10; i++) {
-    await prisma.feedbackResponse.create({
-      data: {
-        userId: appUsers[i].id,
-        variantId: exp4VariantB.id,
-        type: 'MULTIPLE_CHOICE',
-        value: exp4BChoices[i - 5],
-        screenId: 'playlist-screen',
-        appVersion: '1.0.0',
-      },
-    })
-  }
-
-  console.log('Created feedback for Default Sort Preference')
-
-  // ── Standalone text feedback (no experiment) ──────────────────────
-  const standaloneTexts = [
-    { user: appUsers[0], value: 'It would be great to have a sleep timer feature. Sometimes I fall asleep listening and the music just keeps going all night.', screenId: 'player-screen' },
-    { user: appUsers[3], value: 'The app crashes occasionally when I switch between playlists very quickly. Happens maybe once a week.', screenId: 'playlist-screen' },
-    { user: appUsers[7], value: 'Love the app overall! One thing — can you add support for importing playlists from Spotify?', screenId: null },
+  // ── Feedback: Onboarding Tips (THUMBS) ────────────────────────────
+  // Four variants now (Standard, 3/5/7 Tips) — split 10 users across them
+  // roughly evenly, with sentiment trending more positive as the tip
+  // count increases.
+  const [exp2Standard, exp2ThreeTips, exp2FiveTips, exp2SevenTips] = exp2.variants
+  const exp2Groups = [
+    { variant: exp2Standard, users: [0, 1, 2], positiveCount: 1, note: 'I had no idea some of these features existed.' },
+    { variant: exp2ThreeTips, users: [3, 4, 5], positiveCount: 2, note: 'A few useful pointers, could use a couple more.' },
+    { variant: exp2FiveTips, users: [6, 7], positiveCount: 2, note: 'The suggestions were actually really helpful.' },
+    { variant: exp2SevenTips, users: [8, 9], positiveCount: 2, note: 'Covered everything I needed to know upfront.' },
   ]
 
-  for (const { user, value, screenId } of standaloneTexts) {
+  for (const { variant, users, positiveCount, note } of exp2Groups) {
+    for (let i = 0; i < users.length; i++) {
+      await prisma.feedbackResponse.create({
+        data: {
+          userId: appUsers[users[i]].id,
+          variantId: variant.id,
+          type: 'THUMBS',
+          value: i < positiveCount,
+          comment: i === 0 ? note : randomComment(),
+          screenId: 'main-screen',
+          appVersion: '1.0.0',
+        },
+      })
+    }
+  }
+
+  console.log('Created feedback for Onboarding Tips')
+
+  // ── Feedback: Navigation Style (MULTIPLE_CHOICE) ──────────────────
+  const exp3BottomTabs = exp3.variants[0]
+  const exp3SideDrawer = exp3.variants[1]
+
+  // Bottom Tabs skews "Very clear" / "Somewhat clear"
+  const exp3TabsChoices = [0, 0, 1, 0, 2, 1, 0, 3, 1, 0]
+  for (let i = 0; i < 5; i++) {
+    await prisma.feedbackResponse.create({
+      data: {
+        userId: appUsers[i].id,
+        variantId: exp3BottomTabs.id,
+        type: 'MULTIPLE_CHOICE',
+        value: exp3TabsChoices[i],
+        screenId: 'main-screen',
+        appVersion: '1.0.0',
+      },
+    })
+  }
+
+  // Side Drawer skews more toward "A bit confusing"
+  const exp3DrawerChoices = [2, 1, 2, 3, 2, 0, 2, 1, 2, 3]
+  for (let i = 5; i < 10; i++) {
+    await prisma.feedbackResponse.create({
+      data: {
+        userId: appUsers[i].id,
+        variantId: exp3SideDrawer.id,
+        type: 'MULTIPLE_CHOICE',
+        value: exp3DrawerChoices[i - 5],
+        screenId: 'main-screen',
+        appVersion: '1.0.0',
+      },
+    })
+  }
+
+  console.log('Created feedback for Navigation Style')
+
+  // ── General text feedback (always standalone — see FeedbackActivity) ──
+  const generalTexts = [
+    { user: appUsers[0], value: 'It would be great to have a dark mode toggle I can control manually, not just follow system settings.', screenId: 'feedback-screen' },
+    { user: appUsers[3], value: 'The app crashes occasionally when I switch between screens too quickly. Happens maybe once a week.', screenId: 'feedback-screen' },
+    { user: appUsers[7], value: 'Love the app overall! One thing — could you add support for exporting my data?', screenId: 'feedback-screen' },
+  ]
+
+  for (const { user, value, screenId } of generalTexts) {
     await prisma.feedbackResponse.create({
       data: {
         userId: user.id,
         variantId: null,
         type: 'TEXT',
         value,
-        screenId: screenId ?? null,
+        screenId,
         appVersion: '1.0.0',
       },
     })
   }
 
-  console.log('Created standalone text feedback')
+  console.log('Created general text feedback')
 
   console.log('\n========================================')
   console.log('Seed complete!')

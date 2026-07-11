@@ -81,6 +81,10 @@ export async function sendNotification(req, res) {
   }
 }
 
+export function getNotificationStatus(req, res) {
+  res.json({ firebaseConfigured: !!messaging })
+}
+
 export async function getNotificationAudience(req, res) {
   const appId = req.pulseApp.id
   const { type, experimentId } = req.query

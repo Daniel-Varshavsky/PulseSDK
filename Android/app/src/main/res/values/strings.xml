@@ -29,6 +29,8 @@
     <string name="main_switch_variant_none">No active experiment to switch variants on</string>
     <string name="main_cta_default">Learn More</string>
     <string name="main_cta_variant_b">Get Started Now</string>
+    <string name="main_features_title">Suggested for you</string>
+    <string name="main_select_label">Pick an option</string>
 
     <string name="feedback_title">Feedback</string>
     <string name="feedback_from_notification">You got here by tapping a push notification.</string>
@@ -36,4 +38,18 @@
     <string name="feedback_submit">Submit</string>
     <string name="feedback_thanks">Thanks for your feedback!</string>
     <string name="feedback_error_blank">Write something before submitting</string>
+
+    <!-- Backing content for the metadata-driven "Suggested for you" list —
+         purely local, generic filler, not fetched from anywhere. Which of
+         these show up (and how many) is controlled by a variant's
+         "itemLimit" metadata set in the Portal. -->
+    <string-array name="main_feature_suggestions">
+        <item>Personalized recommendations based on your activity</item>
+        <item>Save items to revisit later</item>
+        <item>Get notified about new updates</item>
+        <item>Share with friends in one tap</item>
+        <item>Customize your experience anytime</item>
+        <item>Search across everything in one place</item>
+        <item>Sync your activity across devices</item>
+    </string-array>
 </resources>

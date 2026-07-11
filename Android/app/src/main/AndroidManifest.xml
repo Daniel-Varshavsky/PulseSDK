@@ -15,7 +15,7 @@
 
         <meta-data
             android:name="com.pulsesdk.API_KEY"
-            android:value="685825a8-af0c-4332-a1be-dfb39330e363" />
+            android:value="7d6defdc-0758-4358-8cec-95485a9917fc" />
 
         <meta-data
             android:name="com.pulsesdk.SERVER_URL"

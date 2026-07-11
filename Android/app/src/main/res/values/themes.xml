@@ -13,4 +13,11 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
     </style>
+
+    <!-- Toolbar overflow popup (Switch Variant / Log out). Explicit
+         day/night pair instead of relying on the Toolbar's own
+         android:theme to resolve correctly — that mixed AppCompat/
+         MaterialComponents inheritance is what caused unreadable text
+         after a system day/night switch in the first place. -->
+    <style name="PopupOverlay.PulseSDK" parent="ThemeOverlay.MaterialComponents.Light" />
 </resources>

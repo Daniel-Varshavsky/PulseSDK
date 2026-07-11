@@ -13,4 +13,9 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
     </style>
+
+    <!-- Night-mode counterpart of PopupOverlay.PulseSDK in values/themes.xml —
+         picked automatically by the values-night qualifier when the system
+         is in dark mode. -->
+    <style name="PopupOverlay.PulseSDK" parent="ThemeOverlay.MaterialComponents.Dark" />
 </resources>
