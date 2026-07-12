@@ -61,7 +61,7 @@ This README covers the essentials.
 ## Demo Video
 
 📺 **[Watch the demo](https://github.com/user-attachments/assets/82150f5d-9ed1-475a-b5f0-8dcfed97e737)**
-— a ~2½-minute tour of the **Pulse loop**, the cycle the SDK is named
+— a ~2-minute tour of the **Pulse loop**, the cycle the SDK is named
 after, running end to end against the real app: a user asks for dark
 mode → the team answers with a Light-vs-Dark experiment → users respond
 to the variants → Dark Theme wins and ships as a permanent feature. Also
