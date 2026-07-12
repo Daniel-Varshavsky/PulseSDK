@@ -12,7 +12,6 @@ variant assignment, offline-safe feedback queuing, and syncing everything
 back to the server.
 
 Full docs: **[PulseSDK docs site](https://daniel-varshavsky.github.io/PulseSDK/)**
-(once GitHub Pages is enabled — see below) or browse [`docs/`](docs/) directly.
 This README covers the essentials.
 
 ---
@@ -170,14 +169,14 @@ an experiment with variants, and watch responses arrive on the experiment's
 detail page — no code beyond the SDK calls above.
 
 Full setup instructions (Server + Portal local dev, Android Gradle setup):
-see **[Get Started](docs/get-started.html)**.
+see **[Get Started](https://daniel-varshavsky.github.io/PulseSDK/get-started.html)**.
 
 ---
 
 ## API reference (selected)
 
 Full endpoint list and request/response shapes: see
-**[API Reference](docs/api-reference.html)**.
+**[API Reference](https://daniel-varshavsky.github.io/PulseSDK/api-reference.html)**.
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
