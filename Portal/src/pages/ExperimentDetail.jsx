@@ -119,6 +119,68 @@ function FeedbackRow({ f, showComments }) {
   )
 }
 
+function VariantRow({ v, i }) {
+  const hasMetadata = v.metadata && typeof v.metadata === 'object' && Object.keys(v.metadata).length > 0
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <>
+      <tr className={hasMetadata ? 'cursor-pointer' : ''} style={{ borderTop: '1px solid var(--border)' }}
+        onClick={() => hasMetadata && setExpanded(prev => !prev)}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+              style={{ background: i % 2 === 0 ? cssVar('--chart-bar-a') : cssVar('--chart-bar-b') }} />
+            {v.name}
+          </div>
+        </td>
+        <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.weight}%</td>
+        <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.responseCount}</td>
+        <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{v.summaryValue}</td>
+        <td className="px-6 py-3" style={{ color: 'var(--text-tertiary)' }}>
+          {hasMetadata
+            ? expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+            : <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>—</span>}
+        </td>
+      </tr>
+      {expanded && hasMetadata && (
+        <tr style={{ background: 'var(--bg-subtle)', borderTop: '1px solid var(--border)' }}>
+          <td colSpan={5} className="px-6 py-3">
+            <div className="rounded-lg px-4 py-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Metadata</p>
+              <div className="space-y-1.5">
+                {Object.entries(v.metadata).map(([key, value]) => {
+                  // The Portal's own editor only ever writes flat values, but nothing
+                  // stops a direct API call from setting nested objects/arrays — render
+                  // those as formatted JSON instead of the useless "[object Object]"
+                  // String(value) would otherwise produce.
+                  const isComplex = value !== null && typeof value === 'object'
+                  return isComplex ? (
+                    <div key={key} className="text-sm">
+                      <span className="font-mono" style={{ color: 'var(--text-tertiary)' }}>{key}:</span>
+                      <pre className="mt-1 rounded-md px-3 py-2 text-sm overflow-x-auto"
+                        style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                        {JSON.stringify(value, null, 2)}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div key={key} className="flex items-baseline gap-1.5 text-sm">
+                      <span className="font-mono shrink-0" style={{ color: 'var(--text-tertiary)' }}>{key}:</span>
+                      <span style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{String(value)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 function ChartLegend({ items }) {
   return (
     <div className="flex items-center gap-4 mb-4">
@@ -331,7 +393,7 @@ export default function ExperimentDetail() {
 
   const variantTableData = (experiment?.variants ?? []).map(v => {
     const result = experiment?.results?.find(r => r.variantId === v.id)
-    return { id: v.id, name: v.name, weight: v.weight, responseCount: result?.responseCount ?? 0, summaryValue: getVariantSummaryValue(v, result), choices: v.choices }
+    return { id: v.id, name: v.name, weight: v.weight, responseCount: result?.responseCount ?? 0, summaryValue: getVariantSummaryValue(v, result), choices: v.choices, metadata: v.metadata }
   })
   const sortedVariants = useSortedData(variantTableData, variantSort)
 
@@ -401,25 +463,11 @@ export default function ExperimentDetail() {
                   {col.label}<SortIcon column={col.key} sortConfig={variantSort} />
                 </th>
               ))}
+              <th className="px-6 py-3 w-8" />
             </tr>
           </thead>
           <tbody>
-            {sortedVariants.map((v, i) => (
-              <tr key={v.id} style={{ borderTop: '1px solid var(--border)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                      style={{ background: i % 2 === 0 ? cssVar('--chart-bar-a') : cssVar('--chart-bar-b') }} />
-                    {v.name}
-                  </div>
-                </td>
-                <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.weight}%</td>
-                <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.responseCount}</td>
-                <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{v.summaryValue}</td>
-              </tr>
-            ))}
+            {sortedVariants.map((v, i) => <VariantRow key={v.id} v={v} i={i} />)}
           </tbody>
         </table>
       </div>
