@@ -169,14 +169,14 @@ an experiment with variants, and watch responses arrive on the experiment's
 detail page — no code beyond the SDK calls above.
 
 Full setup instructions (Server + Portal local dev, Android Gradle setup):
-see **[Get Started](docs/get-started.html)**.
+see **[Get Started](https://daniel-varshavsky.github.io/PulseSDK/get-started.html)**.
 
 ---
 
 ## API reference (selected)
 
 Full endpoint list and request/response shapes: see
-**[API Reference](docs/api-reference.html)**.
+**[API Reference](https://daniel-varshavsky.github.io/PulseSDK/api-reference.html)**.
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
