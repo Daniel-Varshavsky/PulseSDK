@@ -12,7 +12,7 @@ variant assignment, offline-safe feedback queuing, and syncing everything
 back to the server.
 
 Full docs: **[PulseSDK docs site](https://daniel-varshavsky.github.io/PulseSDK/)**
-(once GitHub Pages is enabled — see below) or browse [`docs/`](docs/) directly.
+or browse [`docs/`](docs/) directly.
 This README covers the essentials.
 
 ---
