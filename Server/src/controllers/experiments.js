@@ -123,10 +123,13 @@ export async function getExperiments(req, res) {
 }
 
 export async function updateExperiment(req, res) {
-  const { status } = req.body
+  const { status, name, variants } = req.body
 
   try {
-    const existing = await prisma.experiment.findUnique({ where: { id: req.params.id } })
+    const existing = await prisma.experiment.findUnique({
+      where: { id: req.params.id },
+      include: { variants: true },
+    })
     if (!existing) return res.status(404).json({ error: 'Experiment not found' })
 
     const membership = await prisma.appMember.findFirst({
@@ -134,12 +137,51 @@ export async function updateExperiment(req, res) {
     })
     if (!membership) return res.status(403).json({ error: 'Forbidden' })
 
-    const experiment = await prisma.experiment.update({
-      where: { id: req.params.id },
-      data: {
-        ...(status && { status }),
-      },
-      include: { variants: true },
+    // Editing name/variants (weight, choices, metadata) is only allowed
+    // while the experiment is paused -- changing config on a live
+    // experiment would apply inconsistently to users already assigned a
+    // variant this request. Status changes (including un-pausing in this
+    // same request) are unaffected.
+    const editingConfig = name !== undefined || variants !== undefined
+    if (editingConfig && existing.status !== 'PAUSED') {
+      return res.status(400).json({ error: 'Pause the experiment before editing its name or variants' })
+    }
+
+    if (variants !== undefined) {
+      if (!Array.isArray(variants) || variants.reduce((sum, v) => sum + v.weight, 0) !== 100) {
+        return res.status(400).json({ error: 'variants must be an array whose weights sum to 100' })
+      }
+      const existingIds = new Set(existing.variants.map(v => v.id))
+      const incomingIds = variants.map(v => v.id)
+      const sameSet = incomingIds.length === existingIds.size && incomingIds.every(id => existingIds.has(id))
+      if (!sameSet) {
+        return res.status(400).json({ error: "variants must match the experiment's existing variant IDs — adding or removing variants isn't supported" })
+      }
+    }
+
+    const experiment = await prisma.$transaction(async (tx) => {
+      if (variants !== undefined) {
+        for (const v of variants) {
+          await tx.variant.update({
+            where: { id: v.id },
+            data: {
+              name: v.name,
+              weight: v.weight,
+              choices: v.choices ?? null,
+              metadata: v.metadata ?? null,
+            },
+          })
+        }
+      }
+
+      return tx.experiment.update({
+        where: { id: req.params.id },
+        data: {
+          ...(status && { status }),
+          ...(name !== undefined && { name }),
+        },
+        include: { variants: true },
+      })
     })
 
     res.json(experiment)

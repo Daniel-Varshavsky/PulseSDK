@@ -33,7 +33,8 @@ This README covers the essentials.
 
 **Developer Portal**
 - Create and manage apps, invite collaborators by email
-- Create experiments with weighted variants and per-variant metadata
+- Create experiments with weighted variants and per-variant metadata; edit
+  name/weights/choices/metadata later while an experiment is paused
 - Live results per experiment: response counts, average star rating, thumbs
   breakdown, multiple-choice distribution — computed straight from the
   database, no batch jobs
@@ -185,6 +186,7 @@ Full endpoint list and request/response shapes: see
 | `POST` | `/feedback` | API key | Submit a feedback response |
 | `GET` | `/experiments/:id/aggregate` | API key | Live per-variant results |
 | `POST` | `/experiments` | JWT | Create an experiment (Portal) |
+| `PATCH` | `/experiments/:id` | JWT | Update status, or (while paused) name/variants (Portal) |
 | `POST` | `/apps/:id/members` | JWT | Invite a collaborator by email |
 
 **Example — submitting feedback:**

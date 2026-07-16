@@ -93,6 +93,16 @@ PulseSDK.submitText("Would love a dark mode toggle", screenId = "settings")</cod
     variant — and every individual feedback response underneath, filterable
     by variant.</p>
 
+    <h3>Editing an experiment</h3>
+    <p>An experiment's name, per-variant traffic split, choices, and metadata
+    can be edited after creation — but only while its status is
+    <code>PAUSED</code>. Pause it, click <strong>Edit</strong>, make changes,
+    then set it back to <code>ACTIVE</code> (or leave it paused). This is
+    intentionally disallowed on a running experiment: users already assigned
+    a variant would otherwise see inconsistent config mid-experiment. Adding
+    or removing variants, and changing the feedback type, aren't supported
+    here — those require a new experiment.</p>
+
     <h3>Notifications</h3>
     <img class="shot" src="assets/screenshots/06-notifications.png" alt="Sending a push notification from the Portal">
     <p class="shot-caption">Sending a push notification to an app's users, straight from the Portal.</p>

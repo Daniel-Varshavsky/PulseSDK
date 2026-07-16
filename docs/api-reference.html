@@ -138,7 +138,7 @@
       <tr><td><span class="badge delete">DELETE</span><code>/apps/:id/members/:memberId</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Remove a collaborator</td></tr>
       <tr><td><span class="badge get">GET</span><code>/apps/stats</code></td><td><span class="badge auth-key">API key</span></td><td>Usage stats for the current app</td></tr>
       <tr><td><span class="badge post">POST</span><code>/experiments</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Create an experiment</td></tr>
-      <tr><td><span class="badge patch">PATCH</span><code>/experiments/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Update an experiment's status</td></tr>
+      <tr><td><span class="badge patch">PATCH</span><code>/experiments/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Update an experiment's status, or (while paused) its name/variant weights/choices/metadata</td></tr>
       <tr><td><span class="badge get">GET</span><code>/experiments/:id/results</code></td><td><span class="badge auth-key">API key</span></td><td>Results + creator info for one experiment</td></tr>
       <tr><td><span class="badge get">GET</span><code>/experiments/:id/aggregate</code></td><td><span class="badge auth-key">API key</span></td><td>Full per-variant breakdown (star/thumbs/choice)</td></tr>
       <tr><td><span class="badge get">GET</span><code>/feedback</code></td><td><span class="badge auth-key">API key</span></td><td>Paginated, filterable raw feedback responses</td></tr>
