@@ -90,6 +90,19 @@
     <p>Submits a multiple-choice response. <code>index</code> is 0-based into
     the variant's <code>choices</code>.</p>
 
+    <div class="func-sig">fun setCooldownDays(days: Int)</div>
+    <p>Overrides the default 7-day cooldown used by <code>shouldPrompt</code>.</p>
+
+    <div class="func-sig">fun shouldPrompt(screenId: String): Boolean</div>
+    <p>Whether it's been at least the cooldown period since <code>markPrompted</code>
+    was last called for this <code>screenId</code>. Use this to gate <em>any</em>
+    in-app prompt, not just experiment feedback, without hand-rolling a
+    SharedPreferences timestamp check per screen.</p>
+
+    <div class="func-sig">fun markPrompted(screenId: String)</div>
+    <p>Records that a prompt was just shown for <code>screenId</code>, starting
+    the cooldown window <code>shouldPrompt</code> checks against.</p>
+
     <div class="func-sig">fun submitText(text: String, variantId: String? = null, screenId: String? = null)</div>
     <p>Submits open-ended text feedback. Pass <code>variantId = null</code>
     for general feedback not tied to any experiment.</p>
@@ -104,7 +117,10 @@
       <tr><td><code>fetchActiveExperiments()</code></td><td>Fetches and caches the active experiment list once per process.</td></tr>
       <tr><td><code>assignVariant(userId, experiment)</code></td><td>The deterministic hash-based assignment used by <code>getVariant</code>/<code>getActiveVariants</code>.</td></tr>
       <tr><td><code>enqueue(...)</code></td><td>Writes a feedback event to the local Room queue; backs every <code>submit*</code> call.</td></tr>
-      <tr><td><code>scheduleUpload()</code></td><td>Enqueues the WorkManager job that flushes the local feedback queue once a network is available.</td></tr>
+      <tr><td><code>scheduleUpload()</code></td><td>Enqueues the WorkManager job that flushes the local feedback/crash queues once a network is available.</td></tr>
+      <tr><td><code>maybeLogExposure(userId, variantId)</code></td><td>Fire-and-forget exposure log, deduped per (user, variant) per process — called from <code>getVariant</code>/<code>getActiveVariants</code>.</td></tr>
+      <tr><td><code>installCrashHandler()</code></td><td>Chains onto the existing <code>Thread.UncaughtExceptionHandler</code> at init time.</td></tr>
+      <tr><td><code>recordCrashBlocking(throwable)</code></td><td>Synchronously writes a crash report to the Room queue — runs on the crashing thread, can't wait on a dispatcher hop.</td></tr>
       <tr><td><code>checkInitialized()</code></td><td>Guard called at the top of every public function — throws if <code>init()</code> hasn't run.</td></tr>
     </table>
 
@@ -117,8 +133,10 @@
       <tr><td><span class="badge post">POST</span><code>/devices/identify</code></td><td>Link a device to an <code>externalUserId</code></td></tr>
       <tr><td><span class="badge post">POST</span><code>/devices/clear</code></td><td>Unlink a device from its user</td></tr>
       <tr><td><span class="badge post">POST</span><code>/devices/refresh-token</code></td><td>Update a device's FCM token</td></tr>
-      <tr><td><span class="badge get">GET</span><code>/experiments</code></td><td>List active experiments (with variants + live results)</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments</code></td><td>List active experiments with their variants (no results — see <code>/experiments/:id/results</code> or <code>/aggregate</code> for those). Accepts <code>appVersion</code> to filter out version-targeted experiments the device doesn't qualify for</td></tr>
       <tr><td><span class="badge post">POST</span><code>/feedback</code></td><td>Submit a feedback response</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/exposure</code></td><td>Log that a user was shown a variant</td></tr>
+      <tr><td><span class="badge post">POST</span><code>/crashes</code></td><td>Submit a write-ahead-logged crash report</td></tr>
     </table>
 
     <h2 id="endpoints-portal">Endpoints — Portal-facing</h2>
@@ -138,9 +156,9 @@
       <tr><td><span class="badge delete">DELETE</span><code>/apps/:id/members/:memberId</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Remove a collaborator</td></tr>
       <tr><td><span class="badge get">GET</span><code>/apps/stats</code></td><td><span class="badge auth-key">API key</span></td><td>Usage stats for the current app</td></tr>
       <tr><td><span class="badge post">POST</span><code>/experiments</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Create an experiment</td></tr>
-      <tr><td><span class="badge patch">PATCH</span><code>/experiments/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Update an experiment's status, or (while paused) its name/variant weights/choices/metadata</td></tr>
-      <tr><td><span class="badge get">GET</span><code>/experiments/:id/results</code></td><td><span class="badge auth-key">API key</span></td><td>Results + creator info for one experiment</td></tr>
-      <tr><td><span class="badge get">GET</span><code>/experiments/:id/aggregate</code></td><td><span class="badge auth-key">API key</span></td><td>Full per-variant breakdown (star/thumbs/choice)</td></tr>
+      <tr><td><span class="badge patch">PATCH</span><code>/experiments/:id</code></td><td><span class="badge auth-jwt">JWT</span></td><td>Update an experiment's status, or (while paused) its name/variant weights/choices/metadata/minAppVersion</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments/:id/results</code></td><td><span class="badge auth-key">API key</span></td><td>Results + creator info for one experiment, including exposure counts and response rate</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments/:id/aggregate</code></td><td><span class="badge auth-key">API key</span></td><td>Full per-variant breakdown (star/thumbs/choice/exposures)</td></tr>
       <tr><td><span class="badge get">GET</span><code>/feedback</code></td><td><span class="badge auth-key">API key</span></td><td>Paginated, filterable raw feedback responses</td></tr>
       <tr><td><span class="badge post">POST</span><code>/notifications/send</code></td><td><span class="badge auth-key">API key</span></td><td>Send a push notification to an app's users</td></tr>
       <tr><td><span class="badge get">GET</span><code>/notifications/audience</code></td><td><span class="badge auth-key">API key</span></td><td>Count of reachable devices</td></tr>

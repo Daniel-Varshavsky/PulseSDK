@@ -24,8 +24,8 @@ export default function Notifications() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/experiments')
-        setExperiments(res.data.filter(e => e.status === 'ACTIVE'))
+        const res = await api.get('/experiments?status=ACTIVE')
+        setExperiments(res.data)
       } catch (err) { console.error(err) }
     }
     load()

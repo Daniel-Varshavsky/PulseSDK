@@ -8,9 +8,14 @@ internal interface PulseApiService {
 
     // The SDK only ever acts on running experiments, so scope the request
     // server-side instead of shipping paused/draft/completed experiments
-    // to the device just to filter them out locally.
+    // to the device just to filter them out locally. appVersion lets the
+    // server also exclude experiments this device doesn't qualify for
+    // (minAppVersion targeting) before they're ever sent down.
     @GET("experiments")
-    suspend fun getExperiments(@Query("status") status: String = "ACTIVE"): List<ExperimentResponse>
+    suspend fun getExperiments(
+        @Query("status") status: String = "ACTIVE",
+        @Query("appVersion") appVersion: String? = null,
+    ): List<ExperimentResponse>
 
     @POST("feedback")
     suspend fun submitFeedback(@Body body: FeedbackRequest): FeedbackResponse
@@ -26,4 +31,10 @@ internal interface PulseApiService {
 
     @POST("devices/refresh-token")
     suspend fun refreshToken(@Body body: RefreshTokenRequest)
+
+    @POST("exposure")
+    suspend fun logExposure(@Body body: ExposureRequest)
+
+    @POST("crashes")
+    suspend fun submitCrash(@Body body: CrashReportRequest)
 }

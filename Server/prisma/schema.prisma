@@ -51,6 +51,11 @@ model Experiment {
   name          String
   status        ExperimentStatus @default(ACTIVE)
   feedbackType  FeedbackType     @default(STAR_RATING)
+  // Optional targeting: only devices on this app version or newer are
+  // eligible for assignment. Null means unrestricted. Free-form dot-separated
+  // string (Android versionName isn't guaranteed semver), compared segment by
+  // segment — see lib/version.js.
+  minAppVersion String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
@@ -69,6 +74,7 @@ model Variant {
 
   experiment        Experiment         @relation(fields: [experimentId], references: [id])
   feedbackResponses FeedbackResponse[]
+  exposures         Exposure[]
 }
 
 model User {
@@ -80,6 +86,8 @@ model User {
   app               App                @relation(fields: [appId], references: [id])
   deviceTokens      DeviceToken[]
   feedbackResponses FeedbackResponse[]
+  exposures         Exposure[]
+  crashReports      CrashReport[]
 
   @@unique([appId, externalUserId])
 }
@@ -107,6 +115,38 @@ model FeedbackResponse {
 
   user    User     @relation(fields: [userId], references: [id])
   variant Variant? @relation(fields: [variantId], references: [id])
+}
+
+// One row per (user, variant) — logged the first time a variant is resolved
+// for a user in a given app process, not on every getVariant() call, so this
+// counts "was shown", not "was rendered N times". Lets the Portal compute a
+// real response rate (FeedbackResponse count / Exposure count) instead of
+// just a raw response count with no denominator.
+model Exposure {
+  id        String   @id @default(uuid())
+  userId    String
+  variantId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  variant Variant @relation(fields: [variantId], references: [id])
+
+  @@unique([userId, variantId])
+}
+
+// Crash reports are write-ahead-logged client-side (Room) before upload,
+// same pattern as FeedbackResponse — a process that's about to die can't
+// rely on a network call completing, so the SDK persists locally first and a
+// WorkManager job uploads on the next safe opportunity.
+model CrashReport {
+  id         String   @id @default(uuid())
+  userId     String
+  message    String
+  stackTrace String
+  appVersion String?
+  occurredAt DateTime
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum ExperimentStatus {

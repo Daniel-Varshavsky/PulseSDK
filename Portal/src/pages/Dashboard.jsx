@@ -45,26 +45,33 @@ function ExperimentRow({ experiment, onClick }) {
     COMPLETED: { background: 'var(--status-completed-bg)', color: 'var(--status-completed-text)' },
   }
 
-  // Determine summary from results
-  const hasAvgRating = experiment.results?.some(r => r.avgRating != null)
+  // Determine summary from results — names the specific variant the number
+  // belongs to (rather than blending all variants into one figure, or
+  // picking whichever variant happens to be first regardless of whether it
+  // has any responses) so the column is actually attributable.
   function getSummary() {
     if (!experiment.aggregates) return '—'
     const agg = experiment.aggregates
-    if (agg.some(a => a.starRating.count > 0)) {
-      const avg = agg.reduce((s, a) => s + (a.starRating.avgRating ?? 0), 0) / agg.filter(a => a.starRating.avgRating != null).length
-      return `${avg.toFixed(2)} / 5`
+
+    const rated = agg.filter(a => a.starRating.count > 0)
+    if (rated.length > 0) {
+      const best = [...rated].sort((x, y) => (y.starRating.avgRating ?? 0) - (x.starRating.avgRating ?? 0))[0]
+      return `${best.variantName}: ${best.starRating.avgRating.toFixed(2)} / 5`
     }
-    if (agg.some(a => a.thumbs.count > 0)) {
-      const total = agg.reduce((s, a) => s + a.thumbs.count, 0)
-      const pos = agg.reduce((s, a) => s + a.thumbs.positive, 0)
-      return `${Math.round((pos / total) * 100)}% positive`
+
+    const thumbed = agg.filter(a => a.thumbs.count > 0)
+    if (thumbed.length > 0) {
+      const best = [...thumbed].sort((x, y) => y.thumbs.positivePct - x.thumbs.positivePct)[0]
+      return `${best.variantName}: ${best.thumbs.positivePct}% positive`
     }
-    if (agg.some(a => a.multipleChoice.count > 0)) {
-      for (const a of agg) {
-        const leading = a.multipleChoice.choices.sort((x, y) => y.count - x.count)[0]
-        if (leading) return `Option ${leading.index + 1}: ${leading.choice} (${leading.pct}%)`
-      }
+
+    const choseSome = agg.filter(a => a.multipleChoice.count > 0)
+    if (choseSome.length > 0) {
+      const best = [...choseSome].sort((x, y) => y.multipleChoice.count - x.multipleChoice.count)[0]
+      const leading = [...best.multipleChoice.choices].sort((x, y) => y.count - x.count)[0]
+      if (leading) return `${best.variantName}: Option ${leading.index + 1}: ${leading.choice} (${leading.pct}%)`
     }
+
     return '—'
   }
 
@@ -90,7 +97,8 @@ function ExperimentRow({ experiment, onClick }) {
 }
 
 export default function Dashboard() {
-  const [experiments, setExperiments] = useState([])
+  const [activeExperiments, setActiveExperiments] = useState([])
+  const [recentExperiments, setRecentExperiments] = useState([])
   const [stats, setStats] = useState({ activeExperiments: 0, completedExperiments: 0, totalExperiments: 0, totalResponses: 0 })
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
@@ -98,30 +106,30 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        // Fetch experiments and stats in parallel — stats uses DB-level COUNT
-        const [expRes, statsRes] = await Promise.all([
-          api.get('/experiments'),
+        // Two targeted requests instead of one unfiltered list fetched and
+        // then sliced/filtered client-side: the server already supports
+        // status + limit, so ask it for exactly the 5-active-for-charts and
+        // 5-most-recent-for-the-table sets directly.
+        const [activeRes, recentRes, statsRes] = await Promise.all([
+          api.get('/experiments?status=ACTIVE&limit=5'),
+          api.get('/experiments?limit=5'),
           api.get('/apps/stats'),
         ])
 
-        const exps = expRes.data
         setStats(statsRes.data)
 
-        // Fetch aggregates only for active experiments shown in charts (up to 5)
-        const activeExps = exps.filter(e => e.status === 'ACTIVE').slice(0, 5)
+        // Fetch aggregates only for the active experiments shown in charts
         const aggregates = await Promise.all(
-          activeExps.map(e =>
+          activeRes.data.map(e =>
             api.get(`/experiments/${e.id}/aggregate`)
               .then(r => ({ id: e.id, data: r.data.aggregates }))
               .catch(() => ({ id: e.id, data: [] }))
           )
         )
-
-        // Attach aggregates to experiments
         const aggMap = Object.fromEntries(aggregates.map(a => [a.id, a.data]))
-        const enriched = exps.map(e => ({ ...e, aggregates: aggMap[e.id] ?? null }))
 
-        setExperiments(enriched)
+        setActiveExperiments(activeRes.data.map(e => ({ ...e, aggregates: aggMap[e.id] ?? null })))
+        setRecentExperiments(recentRes.data.map(e => ({ ...e, aggregates: aggMap[e.id] ?? null })))
       } catch (err) {
         console.error(err)
       } finally {
@@ -132,9 +140,6 @@ export default function Dashboard() {
     const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
   }, [])
-
-  const activeExperiments = experiments.filter(e => e.status === 'ACTIVE').slice(0, 5)
-  const tableExperiments = experiments.slice(0, 5)
 
   // Build chart data from server-computed aggregates. For experiments with
   // any star rating data, show every variant (defaulting to 0 for ones with
@@ -148,29 +153,29 @@ export default function Dashboard() {
     }))
   })
 
-  const thumbsChartData = activeExperiments.flatMap(exp =>
-    (exp.aggregates ?? [])
-      .filter(a => a.thumbs.count > 0)
-      .map((a, i) => ({
-        name: `${exp.name} — ${a.variantName}`,
-        positive: a.thumbs.positivePct,
-        negative: 100 - a.thumbs.positivePct,
-        total: a.thumbs.count,
-        colorIndex: i,
-      }))
-  )
+  const thumbsChartData = activeExperiments.flatMap(exp => {
+    const aggs = exp.aggregates ?? []
+    if (!aggs.some(a => a.thumbs.count > 0)) return []
+    return aggs.map((a, i) => ({
+      name: `${exp.name} — ${a.variantName}`,
+      positive: a.thumbs.positivePct ?? 0,
+      negative: a.thumbs.positivePct != null ? 100 - a.thumbs.positivePct : 0,
+      total: a.thumbs.count,
+      colorIndex: i,
+    }))
+  })
 
-  const multipleChoiceChartData = activeExperiments.flatMap(exp =>
-    (exp.aggregates ?? [])
-      .filter(a => a.multipleChoice.count > 0)
-      .map((a, vi) => ({
-        experimentName: exp.name,
-        variantName: a.variantName,
-        counts: a.multipleChoice.choices,
-        total: a.multipleChoice.count,
-        colorIndex: vi,
-      }))
-  )
+  const multipleChoiceChartData = activeExperiments.flatMap(exp => {
+    const aggs = exp.aggregates ?? []
+    if (!aggs.some(a => a.multipleChoice.count > 0)) return []
+    return aggs.map((a, vi) => ({
+      experimentName: exp.name,
+      variantName: a.variantName,
+      counts: a.multipleChoice.choices,
+      total: a.multipleChoice.count,
+      colorIndex: vi,
+    }))
+  })
 
   const cBarA = () => cssVar('--chart-bar-a')
   const cBarB = () => cssVar('--chart-bar-b')
@@ -242,11 +247,15 @@ export default function Dashboard() {
               <div key={d.name}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.positive}% positive</span>
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.negative}% negative</span>
-                    <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>({d.total} total)</span>
-                  </div>
+                  {d.total === 0 ? (
+                    <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No responses yet</span>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.positive}% positive</span>
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.negative}% negative</span>
+                      <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>({d.total} total)</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex h-4 rounded-full overflow-hidden" style={{ background: cSubtle() }}>
                   {d.positive > 0 && <div className="h-full" style={{ width: `${d.positive}%`, background: d.colorIndex % 2 === 0 ? cBarA() : cPosB() }} />}
@@ -268,9 +277,14 @@ export default function Dashboard() {
           <div className="space-y-6">
             {multipleChoiceChartData.map(variant => (
               <div key={`${variant.experimentName}-${variant.variantName}`}>
-                <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  {variant.experimentName} — {variant.variantName}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                    {variant.experimentName} — {variant.variantName}
+                  </p>
+                  {variant.total === 0 && (
+                    <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No responses yet</span>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {variant.counts.map(c => (
                     <div key={c.index}>
@@ -296,7 +310,7 @@ export default function Dashboard() {
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Recent Experiments
             <span className="font-normal ml-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              ({tableExperiments.length} of {experiments.length})
+              ({recentExperiments.length} of {stats.totalExperiments})
             </span>
           </h3>
           <button onClick={() => navigate('/experiments')}
@@ -316,14 +330,14 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {tableExperiments.length === 0 ? (
+            {recentExperiments.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
                   No experiments yet
                 </td>
               </tr>
             ) : (
-              tableExperiments.map(exp => (
+              recentExperiments.map(exp => (
                 <ExperimentRow key={exp.id} experiment={exp} onClick={() => navigate(`/experiments/${exp.id}`)} />
               ))
             )}

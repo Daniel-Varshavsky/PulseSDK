@@ -49,12 +49,31 @@ when (variant.variantName) {
 val itemLimit = variant.metadata?.get("itemLimit")?.toIntOrNull() ?: 10</code></pre>
     <p>Assignment is deterministic per <code>(user, experiment)</code> — the
     same user always gets the same variant, cached locally after the first
-    lookup. Returns <code>null</code> if the experiment doesn't exist or isn't
-    <code>ACTIVE</code>.</p>
+    lookup. Returns <code>null</code> if the experiment doesn't exist, isn't
+    <code>ACTIVE</code>, or the experiment has a minimum app version the
+    device doesn't meet (see <a href="#targeting">Targeting by app version</a>
+    below). Every call to <code>getVariant</code>/<code>getActiveVariants</code>
+    also logs an exposure — see <a href="#exposures">Exposure logging</a>.</p>
 
     <p>Need every active experiment at once, instead of naming them one by
     one?</p>
     <pre><code>val variants = PulseSDK.getActiveVariants() // List&lt;VariantResult&gt;</code></pre>
+
+    <h3 id="targeting">Targeting by app version</h3>
+    <p>An experiment can optionally require devices to be on a minimum app
+    version (set from the Portal, see <a href="usage.html#editing-experiment">Editing an experiment</a>).
+    This is enforced server-side — the SDK sends its own <code>versionName</code>
+    on every fetch, and a targeted experiment simply isn't included in the
+    response for devices that don't qualify, so <code>getVariant</code> just
+    returns <code>null</code> for it rather than the app needing to check a
+    version itself.</p>
+
+    <h3 id="exposures">Exposure logging</h3>
+    <p>The SDK automatically logs an exposure — "this user was shown this
+    variant" — the first time <code>getVariant</code>/<code>getActiveVariants</code>
+    resolves a variant in a given process. No extra call needed. This is what
+    lets the Portal show a response rate (responses ÷ times shown) instead of
+    just a raw response count with no denominator.</p>
 
     <h3>QA: preview a specific variant</h3>
     <pre><code>PulseSDK.overrideVariant("Homepage CTA", variantId = "35ec81b3-...")
@@ -62,6 +81,27 @@ val itemLimit = variant.metadata?.get("itemLimit")?.toIntOrNull() ?: 10</code></
 PulseSDK.clearVariantOverride("Homepage CTA")</code></pre>
     <p>This is a local-only override for testing — it doesn't change the real
     assignment server-side, and shouldn't run in production code paths.</p>
+
+    <h2>Rate limiting prompts</h2>
+    <p>Any in-app prompt — not just experiment feedback — can share one
+    cooldown mechanism instead of every screen hand-rolling its own
+    SharedPreferences timestamp check:</p>
+    <pre><code>PulseSDK.setCooldownDays(7) // optional, defaults to 7
+
+if (PulseSDK.shouldPrompt(screenId = "home")) {
+    showFeedbackPrompt()
+    PulseSDK.markPrompted(screenId = "home")
+}</code></pre>
+
+    <h2>Crash capture</h2>
+    <p>Once <code>init()</code> has run, PulseSDK chains onto whatever
+    uncaught-exception handler is already installed (the platform default, or
+    another crash reporter) and write-ahead-logs a report — message, stack
+    trace, app version — to the same kind of local queue feedback events use.
+    No call needed; it's automatic. The write happens synchronously on the
+    crashing thread, since a process about to die can't reliably wait on a
+    coroutine dispatcher. The report uploads via <code>POST /crashes</code> on
+    the next launch that has a network connection.</p>
 
     <h2>Submit feedback</h2>
     <p>All four feedback types take the variant ID you got from
@@ -93,8 +133,9 @@ PulseSDK.submitText("Would love a dark mode toggle", screenId = "settings")</cod
     variant — and every individual feedback response underneath, filterable
     by variant.</p>
 
-    <h3>Editing an experiment</h3>
-    <p>An experiment's name, per-variant traffic split, choices, and metadata
+    <h3 id="editing-experiment">Editing an experiment</h3>
+    <p>An experiment's name, per-variant traffic split, choices, metadata, and
+    minimum app version (see <a href="#targeting">Targeting by app version</a>)
     can be edited after creation — but only while its status is
     <code>PAUSED</code>. Pause it, click <strong>Edit</strong>, make changes,
     then set it back to <code>ACTIVE</code> (or leave it paused). This is

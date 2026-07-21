@@ -100,7 +100,18 @@ export async function getFeedback(req, res) {
       prisma.feedbackResponse.findMany({
         where,
         include: {
-          variant: { select: { id: true, name: true, choices: true } },
+          // experiment (id/name only) lets consumers show which experiment a
+          // response belongs to directly from this response — without it,
+          // every caller would have to separately fetch the full experiment
+          // list and join variantId -> experiment client-side just to
+          // display a name, which is exactly the kind of client-side
+          // computation that belongs server-side instead.
+          variant: {
+            select: {
+              id: true, name: true, choices: true, metadata: true,
+              experiment: { select: { id: true, name: true } },
+            },
+          },
           user: { select: { id: true, externalUserId: true } },
         },
         orderBy: { createdAt: 'desc' },

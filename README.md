@@ -30,14 +30,22 @@ This README covers the essentials.
 - Push notification token registration via Firebase Cloud Messaging
 - QA tooling: `overrideVariant` / `clearVariantOverride` to preview any
   variant without waiting on real assignment
+- Reusable rate limiting (`setCooldownDays` / `shouldPrompt` / `markPrompted`)
+  for any in-app prompt, not just experiment feedback
+- Exposure logging — a real response rate (responses ÷ times shown), not just
+  a raw response count
+- Crash capture — an uncaught-exception handler chains onto whatever handler
+  was already installed and write-ahead-logs a report before the process dies
 
 **Developer Portal**
 - Create and manage apps, invite collaborators by email
 - Create experiments with weighted variants and per-variant metadata; edit
   name/weights/choices/metadata later while an experiment is paused
-- Live results per experiment: response counts, average star rating, thumbs
-  breakdown, multiple-choice distribution — computed straight from the
-  database, no batch jobs
+- Live results per experiment: response counts, response rate (vs. exposures),
+  average star rating, thumbs breakdown, multiple-choice distribution —
+  computed straight from the database, no batch jobs
+- Optional targeting: restrict an experiment to devices on a minimum app
+  version
 - Send push notifications to an app's users
 - Dashboard overview across all active experiments
 
@@ -184,9 +192,11 @@ Full endpoint list and request/response shapes: see
 | `POST` | `/devices/register` | API key | Register a device, get back a `userId` |
 | `GET` | `/experiments` | API key | List active experiments (used by the SDK) |
 | `POST` | `/feedback` | API key | Submit a feedback response |
+| `POST` | `/exposure` | API key | Log that a user was shown a variant |
+| `POST` | `/crashes` | API key | Submit a write-ahead-logged crash report |
 | `GET` | `/experiments/:id/aggregate` | API key | Live per-variant results |
 | `POST` | `/experiments` | JWT | Create an experiment (Portal) |
-| `PATCH` | `/experiments/:id` | JWT | Update status, or (while paused) name/variants (Portal) |
+| `PATCH` | `/experiments/:id` | JWT | Update status, or (while paused) name/variants/targeting (Portal) |
 | `POST` | `/apps/:id/members` | JWT | Invite a collaborator by email |
 
 **Example — submitting feedback:**
@@ -218,6 +228,8 @@ Content-Type: application/json
       "variantId": "35ec81b3-7d76-46a1-ae25-3afa9d6e6332",
       "variantName": "Light Theme",
       "responseCount": 5,
+      "exposureCount": 12,
+      "responseRatePct": 42,
       "starRating": { "avgRating": 3.8, "count": 5 }
     }
   ]

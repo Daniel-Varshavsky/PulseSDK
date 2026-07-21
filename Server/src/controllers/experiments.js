@@ -1,11 +1,17 @@
 import prisma from '../lib/prisma.js'
+import { satisfiesMinVersion } from '../lib/version.js'
 
 // TEXT isn't offered here — standalone submitText() (general feedback) already
 // covers free-text responses, tied to a variant when one is active.
 const VALID_FEEDBACK_TYPES = ['STAR_RATING', 'THUMBS', 'MULTIPLE_CHOICE']
 
+// "1", "1.2", "1.2.3" — plain dot-separated numeric segments only. Rejects
+// anything with pre-release/build metadata suffixes up front, rather than
+// silently treating them as equal at comparison time.
+const VERSION_PATTERN = /^\d+(\.\d+)*$/
+
 export async function createExperiment(req, res) {
-  const { appId, name, variants, feedbackType = 'STAR_RATING' } = req.body
+  const { appId, name, variants, feedbackType = 'STAR_RATING', minAppVersion } = req.body
 
   if (!appId || !name || !variants) {
     return res.status(400).json({ error: 'appId, name, and variants are required' })
@@ -17,6 +23,10 @@ export async function createExperiment(req, res) {
 
   if (!VALID_FEEDBACK_TYPES.includes(feedbackType)) {
     return res.status(400).json({ error: `feedbackType must be one of: ${VALID_FEEDBACK_TYPES.join(', ')}` })
+  }
+
+  if (minAppVersion != null && !VERSION_PATTERN.test(minAppVersion)) {
+    return res.status(400).json({ error: 'minAppVersion must be dot-separated numbers, e.g. "2.1.0"' })
   }
 
   try {
@@ -31,6 +41,7 @@ export async function createExperiment(req, res) {
         createdById: req.account.id,
         name,
         feedbackType,
+        minAppVersion: minAppVersion || null,
         variants: {
           create: variants.map(v => ({
             name: v.name,
@@ -57,6 +68,10 @@ export async function getExperiments(req, res) {
     name,
     limit,
     offset = 0,
+    // Sent by the SDK on every fetch (the device's own versionName) so
+    // version-targeted experiments can be filtered out before the client
+    // ever sees them, rather than trusting it to self-exclude.
+    appVersion,
   } = req.query
 
   try {
@@ -68,54 +83,28 @@ export async function getExperiments(req, res) {
       ...(name && { name: { contains: name, mode: 'insensitive' } }),
     }
 
-    const experiments = await prisma.experiment.findMany({
+    let experiments = await prisma.experiment.findMany({
       where,
-      // No createdBy here — this endpoint is shared by the SDK and every
-      // Portal list view, and neither uses it. ExperimentDetail is the
-      // only consumer, via getExperimentResults below.
+      // No createdBy, no results/aggregate — this endpoint is shared by the
+      // SDK (which only ever needs variants to assign one) and every Portal
+      // list/dropdown view (which only ever needs id/name/variants to
+      // render). Live results are computed on request by
+      // getExperimentResults/getExperimentAggregate below, the only two
+      // endpoints anything actually reads them from — computing a
+      // groupBy + raw SQL aggregate here on every list/SDK fetch, for data
+      // nothing consumes, was pure waste.
       include: { variants: true },
       orderBy: { createdAt: 'desc' },
       ...(limit && { take: parseInt(limit) }),
       skip: parseInt(offset),
     })
 
-    // Compute live results using DB-level aggregation — no raw rows returned
-    const allVariantIds = experiments.flatMap(e => e.variants.map(v => v.id))
+    // Version comparison isn't expressible as a portable SQL WHERE clause
+    // for arbitrary-length dot-separated segments, so it's filtered in JS
+    // post-fetch — fine at this scale (one app's experiment list).
+    experiments = experiments.filter(e => satisfiesMinVersion(appVersion, e.minAppVersion))
 
-    const [totalCounts, starRows] = await Promise.all([
-      prisma.feedbackResponse.groupBy({
-        by: ['variantId'],
-        where: { variantId: { in: allVariantIds } },
-        _count: { id: true },
-      }),
-      prisma.$queryRaw`
-        SELECT
-          "variantId",
-          COUNT(*)::int AS count,
-          AVG((value::text)::numeric) AS avg
-        FROM "FeedbackResponse"
-        WHERE "variantId" = ANY(${allVariantIds})
-          AND type = 'STAR_RATING'
-        GROUP BY "variantId"
-      `,
-    ])
-
-    const totalMap = Object.fromEntries(totalCounts.map(r => [r.variantId, r._count.id]))
-    const starMap = Object.fromEntries(starRows.map(r => [r.variantId, { count: r.count, avg: r.avg }]))
-
-    const experimentsWithResults = experiments.map(exp => {
-      const results = exp.variants.map(variant => ({
-        variantId: variant.id,
-        variantName: variant.name,
-        responseCount: totalMap[variant.id] ?? 0,
-        avgRating: starMap[variant.id]?.avg != null
-          ? parseFloat(Number(starMap[variant.id].avg).toFixed(2))
-          : null,
-      }))
-      return { ...exp, results }
-    })
-
-    res.json(experimentsWithResults)
+    res.json(experiments)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Failed to fetch experiments' })
@@ -123,7 +112,7 @@ export async function getExperiments(req, res) {
 }
 
 export async function updateExperiment(req, res) {
-  const { status, name, variants } = req.body
+  const { status, name, variants, minAppVersion } = req.body
 
   try {
     const existing = await prisma.experiment.findUnique({
@@ -137,14 +126,17 @@ export async function updateExperiment(req, res) {
     })
     if (!membership) return res.status(403).json({ error: 'Forbidden' })
 
-    // Editing name/variants (weight, choices, metadata) is only allowed
-    // while the experiment is paused -- changing config on a live
-    // experiment would apply inconsistently to users already assigned a
-    // variant this request. Status changes (including un-pausing in this
-    // same request) are unaffected.
-    const editingConfig = name !== undefined || variants !== undefined
+    // Editing name/variants/targeting is only allowed while the experiment
+    // is paused -- changing config on a live experiment would apply
+    // inconsistently to users already assigned a variant this request.
+    // Status changes (including un-pausing in this same request) are unaffected.
+    const editingConfig = name !== undefined || variants !== undefined || minAppVersion !== undefined
     if (editingConfig && existing.status !== 'PAUSED') {
-      return res.status(400).json({ error: 'Pause the experiment before editing its name or variants' })
+      return res.status(400).json({ error: 'Pause the experiment before editing its name, variants, or targeting' })
+    }
+
+    if (minAppVersion != null && !VERSION_PATTERN.test(minAppVersion)) {
+      return res.status(400).json({ error: 'minAppVersion must be dot-separated numbers, e.g. "2.1.0"' })
     }
 
     if (variants !== undefined) {
@@ -179,6 +171,7 @@ export async function updateExperiment(req, res) {
         data: {
           ...(status && { status }),
           ...(name !== undefined && { name }),
+          ...(minAppVersion !== undefined && { minAppVersion: minAppVersion || null }),
         },
         include: { variants: true },
       })
@@ -206,7 +199,7 @@ export async function getExperimentResults(req, res) {
 
     const variantIds = experiment.variants.map(v => v.id)
 
-    const [totalCounts, starRows] = await Promise.all([
+    const [totalCounts, starRows, exposureCounts] = await Promise.all([
       prisma.feedbackResponse.groupBy({
         by: ['variantId'],
         where: { variantId: { in: variantIds } },
@@ -222,19 +215,31 @@ export async function getExperimentResults(req, res) {
           AND type = 'STAR_RATING'
         GROUP BY "variantId"
       `,
+      prisma.exposure.groupBy({
+        by: ['variantId'],
+        where: { variantId: { in: variantIds } },
+        _count: { id: true },
+      }),
     ])
 
     const totalMap = Object.fromEntries(totalCounts.map(r => [r.variantId, r._count.id]))
     const starMap = Object.fromEntries(starRows.map(r => [r.variantId, { avg: r.avg }]))
+    const exposureMap = Object.fromEntries(exposureCounts.map(r => [r.variantId, r._count.id]))
 
-    const results = experiment.variants.map(variant => ({
-      variantId: variant.id,
-      variantName: variant.name,
-      responseCount: totalMap[variant.id] ?? 0,
-      avgRating: starMap[variant.id]?.avg != null
-        ? parseFloat(Number(starMap[variant.id].avg).toFixed(2))
-        : null,
-    }))
+    const results = experiment.variants.map(variant => {
+      const responseCount = totalMap[variant.id] ?? 0
+      const exposureCount = exposureMap[variant.id] ?? 0
+      return {
+        variantId: variant.id,
+        variantName: variant.name,
+        responseCount,
+        exposureCount,
+        responseRatePct: exposureCount > 0 ? Math.round((responseCount / exposureCount) * 100) : null,
+        avgRating: starMap[variant.id]?.avg != null
+          ? parseFloat(Number(starMap[variant.id].avg).toFixed(2))
+          : null,
+      }
+    })
 
     res.json({ ...experiment, results })
   } catch (err) {
@@ -257,7 +262,7 @@ export async function getExperimentAggregate(req, res) {
 
     // Use database-level aggregation — COUNT and GROUP BY in SQL
     // value is Json so we use raw SQL to cast it for AVG on star ratings
-    const [totalCounts, thumbsGroups, mcGroups] = await prisma.$transaction([
+    const [totalCounts, thumbsGroups, mcGroups, exposureCounts] = await prisma.$transaction([
 
       // Total responses per variant — COUNT(*) GROUP BY variantId
       prisma.feedbackResponse.groupBy({
@@ -277,6 +282,13 @@ export async function getExperimentAggregate(req, res) {
       prisma.feedbackResponse.groupBy({
         by: ['variantId', 'value'],
         where: { variantId: { in: variantIds }, type: 'MULTIPLE_CHOICE' },
+        _count: { id: true },
+      }),
+
+      // Exposures per variant — the denominator for a real response rate
+      prisma.exposure.groupBy({
+        by: ['variantId'],
+        where: { variantId: { in: variantIds } },
         _count: { id: true },
       }),
     ])
@@ -313,9 +325,13 @@ export async function getExperimentAggregate(req, res) {
       mcMap[r.variantId][Number(r.value)] = r._count.id
     })
 
+    const exposureMap = Object.fromEntries(exposureCounts.map(r => [r.variantId, r._count.id]))
+
     // Assemble final response — no raw rows, just computed numbers
     const aggregates = experiment.variants.map(variant => {
       const total = totalMap[variant.id] ?? 0
+      const exposureCount = exposureMap[variant.id] ?? 0
+      const responseRatePct = exposureCount > 0 ? Math.round((total / exposureCount) * 100) : null
 
       const star = starMap[variant.id]
       const avgRating = star?.avg != null ? parseFloat(Number(star.avg).toFixed(2)) : null
@@ -339,6 +355,8 @@ export async function getExperimentAggregate(req, res) {
         variantId: variant.id,
         variantName: variant.name,
         responseCount: total,
+        exposureCount,
+        responseRatePct,
         starRating: { avgRating, count: star?.count ?? 0 },
         thumbs: {
           positive: thumbs.positive,

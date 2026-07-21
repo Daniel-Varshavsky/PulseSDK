@@ -26,6 +26,8 @@ const feedbackTypeOptions = [
 function CreateExperimentModal({ onClose, onCreate }) {
   const [name, setName] = useState('')
   const [feedbackType, setFeedbackType] = useState('STAR_RATING')
+  const [minAppVersion, setMinAppVersion] = useState('')
+  const [minAppVersionError, setMinAppVersionError] = useState(null)
   const [variants, setVariants] = useState([
     { name: 'Variant A', weight: 50, choices: ['Option 1', 'Option 2'], metadataMode: 'fields', metadataFields: [{ key: '', value: '' }], metadataJson: '', metadataError: null },
     { name: 'Variant B', weight: 50, choices: ['Option 1', 'Option 2'], metadataMode: 'fields', metadataFields: [{ key: '', value: '' }], metadataJson: '', metadataError: null },
@@ -162,6 +164,11 @@ function CreateExperimentModal({ onClose, onCreate }) {
   const totalWeight = variants.reduce((sum, v) => sum + Number(v.weight), 0)
   const isMultipleChoice = feedbackType === 'MULTIPLE_CHOICE'
 
+  function validateMinAppVersion(value) {
+    if (!value.trim()) return null
+    return /^\d+(\.\d+)*$/.test(value.trim()) ? null : 'Must be dot-separated numbers, e.g. "2.1.0"'
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
@@ -172,6 +179,8 @@ function CreateExperimentModal({ onClose, onCreate }) {
       setError('Choice options cannot be blank')
       return
     }
+    const versionError = validateMinAppVersion(minAppVersion)
+    if (versionError) { setMinAppVersionError(versionError); return }
     setLoading(true)
     try {
       const variantsWithMetadata = variants.map(v => ({ ...v, resolvedMetadata: resolveVariantMetadata(v) }))
@@ -179,6 +188,7 @@ function CreateExperimentModal({ onClose, onCreate }) {
         appId: activeApp.id,
         name,
         feedbackType,
+        minAppVersion: minAppVersion.trim() || null,
         variants: variantsWithMetadata.map(v => ({
           name: v.name,
           weight: Number(v.weight),
@@ -220,6 +230,23 @@ function CreateExperimentModal({ onClose, onCreate }) {
             </select>
             <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
               How the app collects feedback for this experiment.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+              Minimum App Version <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+            </label>
+            <input value={minAppVersion}
+              onChange={e => { setMinAppVersion(e.target.value); setMinAppVersionError(null) }}
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={{ ...inputStyle, boxShadow: 'none' }}
+              onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+              onBlur={e => e.target.style.boxShadow = 'none'}
+              placeholder="e.g. 2.1.0 — leave blank for no restriction" />
+            {minAppVersionError && <p className="text-sm mt-1" style={{ color: '#EF4444' }}>{minAppVersionError}</p>}
+            <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+              Only devices on this app version or newer are eligible for assignment.
             </p>
           </div>
 

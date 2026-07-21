@@ -5,10 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [PendingEvent::class], version = 1, exportSchema = false)
+@Database(entities = [PendingEvent::class, PendingCrash::class], version = 2, exportSchema = false)
 internal abstract class PulseDatabase : RoomDatabase() {
 
     abstract fun pendingEventDao(): PendingEventDao
+    abstract fun pendingCrashDao(): PendingCrashDao
 
     companion object {
         @Volatile
@@ -20,7 +21,19 @@ internal abstract class PulseDatabase : RoomDatabase() {
                     context.applicationContext,
                     PulseDatabase::class.java,
                     "pulse_db"
-                ).build().also { instance = it }
+                )
+                    // This is a transient local queue, not a system of record —
+                    // losing unsent events across an app-version upgrade that
+                    // changes the schema is an acceptable trade-off against
+                    // hand-writing Room migrations for a cache table.
+                    .fallbackToDestructiveMigration()
+                    // A crash can happen on the main thread, and the crash
+                    // handler needs the write to complete before the process
+                    // dies — no dispatcher hop it can safely wait on. Scoped to
+                    // this one blocking DAO call (PendingCrashDao.insertBlocking);
+                    // every other access in the SDK stays off the main thread.
+                    .allowMainThreadQueries()
+                    .build().also { instance = it }
             }
         }
     }

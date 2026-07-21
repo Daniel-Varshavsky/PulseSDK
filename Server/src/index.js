@@ -9,6 +9,8 @@ import feedbackRoutes from './routes/feedback.js'
 import deviceRoutes from './routes/devices.js'
 import notificationRoutes from './routes/notifications.js'
 import authRoutes from './routes/auth.js'
+import exposureRoutes from './routes/exposures.js'
+import crashRoutes from './routes/crashes.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { runTokenCleanup } from './workers/tokenCleanup.js'
 
@@ -26,6 +28,8 @@ app.use('/feedback', feedbackRoutes)
 app.use('/devices', deviceRoutes)
 app.use('/notifications', notificationRoutes)
 app.use('/auth', authRoutes)
+app.use('/exposure', exposureRoutes)
+app.use('/crashes', crashRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })

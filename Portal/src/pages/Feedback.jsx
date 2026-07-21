@@ -192,12 +192,14 @@ export default function Feedback() {
         if (variantFilter) params.set('variantId', variantFilter)
 
         const fbRes = await api.get(`/feedback?${params.toString()}`)
-        const exps = experiments
-
-        const enriched = fbRes.data.responses.map(f => {
-          const exp = exps.find(e => e.variants?.some(v => v.id === f.variantId))
-          return { ...f, experimentName: exp?.name ?? null, experimentId: exp?.id ?? null }
-        })
+        // experimentName/experimentId come straight from the response's
+        // nested variant.experiment (added server-side) — no need to also
+        // cross-reference the separately-fetched experiments list here.
+        const enriched = fbRes.data.responses.map(f => ({
+          ...f,
+          experimentName: f.variant?.experiment?.name ?? null,
+          experimentId: f.variant?.experiment?.id ?? null,
+        }))
         setFeedback(enriched)
       } catch (err) { console.error(err) }
     }

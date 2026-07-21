@@ -7,6 +7,7 @@ import com.google.gson.Gson
 import com.pulsesdk.network.PulseApiClient
 import com.pulsesdk.network.requests.*
 import com.pulsesdk.network.responses.ExperimentResponse
+import com.pulsesdk.storage.PendingCrash
 import com.pulsesdk.storage.PendingEvent
 import com.pulsesdk.storage.PulseDatabase
 import com.pulsesdk.util.VariantAssigner
@@ -14,6 +15,8 @@ import com.pulsesdk.worker.PulseUploadWorker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 object PulseSDK {
 
@@ -30,6 +33,17 @@ object PulseSDK {
     // take effect.
     private var cachedExperiments: List<ExperimentResponse>? = null
     private val experimentsCacheMutex = Mutex()
+
+    // Variants already logged as "shown" this process — getVariant() can be
+    // called many times per session (every screen that checks it), but an
+    // exposure should be counted once per (user, variant) per launch, not
+    // once per call. ConcurrentHashMap-backed set for thread safety without
+    // a full mutex, since this is checked on every getVariant() call.
+    private val loggedExposures = ConcurrentHashMap.newKeySet<String>()
+
+    private var cooldownDays: Long = 7
+
+    private var previousCrashHandler: Thread.UncaughtExceptionHandler? = null
 
     // ── Initialization ────────────────────────────────────────────
 
@@ -61,8 +75,14 @@ object PulseSDK {
         // launch instead of being stuck behind a cache that never expires.
         clearAllVariantCache()
 
-        // Register device in background
+        installCrashHandler()
+
+        // Register device in background, then flush anything the write-ahead
+        // queues collected while the process wasn't running — feedback/exposure
+        // events from a connection that dropped, and any crash report written
+        // by installCrashHandler() during a previous, now-dead process.
         scope.launch { registerDevice() }
+        scheduleUpload()
     }
 
     /**
@@ -73,7 +93,7 @@ object PulseSDK {
         cachedExperiments?.let { return it }
         return experimentsCacheMutex.withLock {
             cachedExperiments?.let { return@withLock it }
-            val experiments = PulseApiClient.getService().getExperiments()
+            val experiments = PulseApiClient.getService().getExperiments(appVersion = getAppVersion())
             cachedExperiments = experiments
             experiments
         }
@@ -209,7 +229,9 @@ object PulseSDK {
         val cacheKey = variantCacheKey(experimentName)
         val cached = prefs.getString(cacheKey, null)
         if (cached != null) {
-            return gson.fromJson(cached, VariantResult::class.java)
+            val result = gson.fromJson(cached, VariantResult::class.java)
+            maybeLogExposure(userId, result.variantId)
+            return result
         }
 
         // Fetch experiments and assign synchronously
@@ -222,6 +244,7 @@ object PulseSDK {
 
                 // Cache the assignment
                 prefs.edit().putString(cacheKey, gson.toJson(result)).apply()
+                maybeLogExposure(userId, result.variantId)
 
                 result
             } catch (e: Exception) {
@@ -247,13 +270,14 @@ object PulseSDK {
                 experiments.mapNotNull { experiment ->
                     val cacheKey = variantCacheKey(experiment.name)
                     val cached = prefs.getString(cacheKey, null)
-                    if (cached != null) {
+                    val result = if (cached != null) {
                         gson.fromJson(cached, VariantResult::class.java)
                     } else {
                         assignVariant(userId, experiment)?.also {
                             prefs.edit().putString(cacheKey, gson.toJson(it)).apply()
                         }
                     }
+                    result?.also { maybeLogExposure(userId, it.variantId) }
                 }
             } catch (e: Exception) {
                 emptyList()
@@ -341,6 +365,110 @@ object PulseSDK {
 
     private fun variantCacheKey(experimentName: String) = "variant_$experimentName"
 
+    // ── Exposure Logging ──────────────────────────────────────────
+
+    /**
+     * Fire-and-forget: logs that [userId] was shown [variantId], once per
+     * (user, variant) per process. This is what lets the Portal compute a
+     * real response rate instead of a raw response count with no
+     * denominator. Unlike feedback submission, exposures aren't offline-
+     * queued — losing an occasional exposure log to a dropped connection
+     * doesn't matter the way losing a user's actual feedback would, so this
+     * skips the Room write-ahead queue in favor of a plain best-effort call.
+     */
+    private fun maybeLogExposure(userId: String, variantId: String) {
+        if (!loggedExposures.add("$userId:$variantId")) return
+        scope.launch {
+            try {
+                PulseApiClient.getService().logExposure(ExposureRequest(userId, variantId))
+            } catch (e: Exception) {
+                // Best-effort — a missed exposure log just slightly undercounts
+                // the response rate, it isn't user-visible.
+            }
+        }
+    }
+
+    // ── Rate Limiting ──────────────────────────────────────────────
+
+    /**
+     * Overrides the default 7-day cooldown used by [shouldPrompt]. Call once,
+     * typically at init time.
+     */
+    fun setCooldownDays(days: Int) {
+        require(days >= 0) { "days must be >= 0" }
+        cooldownDays = days.toLong()
+    }
+
+    /**
+     * Whether it's been at least [setCooldownDays] (default 7) since the app
+     * last called [markPrompted] for this [screenId]. Use this to decide
+     * whether to show *any* in-app prompt — a feedback dialog, an experiment
+     * prompt, a rating request — without hand-rolling a SharedPreferences
+     * timestamp check per screen.
+     */
+    fun shouldPrompt(screenId: String): Boolean {
+        checkInitialized()
+        val last = prefs.getLong(lastPromptKey(screenId), 0L)
+        return System.currentTimeMillis() - last >= TimeUnit.DAYS.toMillis(cooldownDays)
+    }
+
+    /**
+     * Records that a prompt was just shown for [screenId], starting the
+     * cooldown window [shouldPrompt] checks against.
+     */
+    fun markPrompted(screenId: String) {
+        checkInitialized()
+        prefs.edit().putLong(lastPromptKey(screenId), System.currentTimeMillis()).apply()
+    }
+
+    private fun lastPromptKey(screenId: String) = "last_prompt_$screenId"
+
+    // ── Crash Reporting ────────────────────────────────────────────
+
+    /**
+     * Wraps whatever uncaught-exception handler was already installed (the
+     * platform default, or another crash reporter like Crashlytics) so
+     * PulseSDK captures a copy without suppressing anyone else's handling.
+     * The write happens synchronously on the crashing thread — by the time
+     * an uncaught exception reaches here the process may terminate within
+     * milliseconds, so this can't wait for a coroutine dispatcher hop.
+     */
+    private fun installCrashHandler() {
+        val existing = Thread.getDefaultUncaughtExceptionHandler()
+        if (existing is PulseCrashHandler) return // already installed (re-entrant init() call)
+        previousCrashHandler = existing
+        Thread.setDefaultUncaughtExceptionHandler(PulseCrashHandler())
+    }
+
+    private inner class PulseCrashHandler : Thread.UncaughtExceptionHandler {
+        override fun uncaughtException(thread: Thread, throwable: Throwable) {
+            try {
+                recordCrashBlocking(throwable)
+            } catch (e: Exception) {
+                // Don't let a failure here block the real crash handling below
+            } finally {
+                previousCrashHandler?.uncaughtException(thread, throwable)
+            }
+        }
+    }
+
+    private fun recordCrashBlocking(throwable: Throwable) {
+        // Can't attribute a crash to nobody — if registerDevice() hasn't
+        // completed yet (e.g. a crash in the first seconds after install),
+        // there's no userId to report it under.
+        val userId = PulseConfig.userId ?: return
+
+        PulseDatabase.getInstance(appContext).pendingCrashDao().insertBlocking(
+            PendingCrash(
+                userId = userId,
+                message = throwable.message ?: throwable.toString(),
+                stackTrace = android.util.Log.getStackTraceString(throwable),
+                appVersion = getAppVersion(),
+                occurredAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
     // ── Feedback Submission ───────────────────────────────────────
 
     /**
@@ -385,12 +513,6 @@ object PulseSDK {
         checkInitialized()
         val userId = PulseConfig.userId ?: return
 
-        val appVersion = try {
-            appContext.packageManager
-                .getPackageInfo(appContext.packageName, 0)
-                .versionName
-        } catch (e: Exception) { null }
-
         scope.launch {
             val db = PulseDatabase.getInstance(appContext)
             db.pendingEventDao().insert(
@@ -401,7 +523,7 @@ object PulseSDK {
                     value = value,
                     comment = comment,
                     screenId = screenId,
-                    appVersion = appVersion,
+                    appVersion = getAppVersion(),
                 )
             )
             scheduleUpload()
@@ -429,6 +551,12 @@ object PulseSDK {
     private fun getSavedFcmToken(): String? {
         return prefs.getString("pulse_fcm_token", null)
     }
+
+    private fun getAppVersion(): String? = try {
+        appContext.packageManager
+            .getPackageInfo(appContext.packageName, 0)
+            .versionName
+    } catch (e: Exception) { null }
 
     private fun checkInitialized() {
         check(PulseConfig.isInitialized) {

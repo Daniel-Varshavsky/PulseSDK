@@ -119,14 +119,16 @@ function FeedbackRow({ f, showComments }) {
   )
 }
 
-function VariantRow({ v, i }) {
+function VariantRow({ v, i, showMetadata }) {
   const hasMetadata = v.metadata && typeof v.metadata === 'object' && Object.keys(v.metadata).length > 0
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(null)
+  useEffect(() => { setLocalExpanded(null) }, [showMetadata])
+  const expanded = localExpanded !== null ? localExpanded : showMetadata
 
   return (
     <>
       <tr className={hasMetadata ? 'cursor-pointer' : ''} style={{ borderTop: '1px solid var(--border)' }}
-        onClick={() => hasMetadata && setExpanded(prev => !prev)}
+        onClick={() => hasMetadata && setLocalExpanded(prev => prev === null ? !showMetadata : !prev)}
         onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
         <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -137,7 +139,12 @@ function VariantRow({ v, i }) {
           </div>
         </td>
         <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.weight}%</td>
-        <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.responseCount}</td>
+        <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {v.responseCount} <span style={{ color: 'var(--text-tertiary)' }}>/ {v.exposureCount} shown</span>
+          {v.responseRatePct != null && (
+            <span className="ml-1" style={{ color: 'var(--text-tertiary)' }}>({v.responseRatePct}%)</span>
+          )}
+        </td>
         <td className="px-6 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{v.summaryValue}</td>
         <td className="px-6 py-3" style={{ color: 'var(--text-tertiary)' }}>
           {hasMetadata
@@ -220,15 +227,18 @@ function StarRatingChart({ data }) {
   )
 }
 
-function ThumbsChart({ data, feedback }) {
+function ThumbsChart({ aggregates }) {
   const barA = cssVar('--chart-bar-a'), posB = cssVar('--chart-positive-b'), neg = cssVar('--chart-negative')
-  const chartData = data.map((r, i) => {
-    const vf = feedback.filter(f => f.variantId === r.variantId && f.type === 'THUMBS')
-    const total = vf.length
-    const pos = vf.filter(f => f.value === true).length
-    const posPct = total > 0 ? Math.round((pos / total) * 100) : 0
-    return { name: r.variantName, positive: posPct, negative: 100 - posPct, total, colorIndex: i }
-  }).filter(d => d.total > 0)
+  // Every variant is shown, including ones with zero responses yet — matches
+  // StarRatingChart, which already shows all variants rather than only ones
+  // with data.
+  const chartData = aggregates.map((a, i) => ({
+    name: a.variantName,
+    positive: a.thumbs.positivePct ?? 0,
+    negative: a.thumbs.positivePct != null ? 100 - a.thumbs.positivePct : 0,
+    total: a.thumbs.count,
+    colorIndex: i,
+  }))
   if (chartData.length === 0) return null
   return (
     <div className="rounded-xl p-6" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
@@ -239,11 +249,15 @@ function ThumbsChart({ data, feedback }) {
           <div key={d.name}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.positive}% positive</span>
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.negative}% negative</span>
-                <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>({d.total} total)</span>
-              </div>
+              {d.total === 0 ? (
+                <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No responses yet</span>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.positive}% positive</span>
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{d.negative}% negative</span>
+                  <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>({d.total} total)</span>
+                </div>
+              )}
             </div>
             <div className="flex h-4 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
               {d.positive > 0 && <div className="h-full transition-all" style={{ width: `${d.positive}%`, background: d.colorIndex % 2 === 0 ? barA : posB }} />}
@@ -256,18 +270,17 @@ function ThumbsChart({ data, feedback }) {
   )
 }
 
-function MultipleChoiceChart({ variants, feedback }) {
+function MultipleChoiceChart({ aggregates }) {
   const barA = cssVar('--chart-bar-a'), posB = cssVar('--chart-positive-b')
-  const chartData = variants.map((v, vi) => {
-    const vf = feedback.filter(f => f.variantId === v.id && f.type === 'MULTIPLE_CHOICE')
-    if (vf.length === 0) return null
-    const choices = v.choices ?? []
-    const counts = choices.map((choice, ci) => ({
-      choice: `Option ${ci + 1}: ${choice}`,
-      count: vf.filter(f => Number(f.value) === ci).length,
-    }))
-    return { variantName: v.name, counts, total: vf.length, colorIndex: vi }
-  }).filter(Boolean)
+  // Every variant is shown, including ones with zero responses yet — matches
+  // StarRatingChart, which already shows all variants rather than only ones
+  // with data.
+  const chartData = aggregates.map((a, vi) => ({
+    variantName: a.variantName,
+    counts: a.multipleChoice.choices.map(c => ({ choice: `Option ${c.index + 1}: ${c.choice}`, count: c.count, pct: c.pct })),
+    total: a.multipleChoice.count,
+    colorIndex: vi,
+  }))
   if (chartData.length === 0) return null
   return (
     <div className="rounded-xl p-6" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
@@ -275,23 +288,25 @@ function MultipleChoiceChart({ variants, feedback }) {
       <div className="space-y-6">
         {chartData.map(variant => (
           <div key={variant.variantName}>
-            <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>{variant.variantName}</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{variant.variantName}</p>
+              {variant.total === 0 && (
+                <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No responses yet</span>
+              )}
+            </div>
             <div className="space-y-2">
-              {variant.counts.map(c => {
-                const pct = variant.total > 0 ? Math.round((c.count / variant.total) * 100) : 0
-                return (
-                  <div key={c.choice}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{c.choice}</span>
-                      <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{c.count} ({pct}%)</span>
-                    </div>
-                    <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
-                      <div className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, background: variant.colorIndex % 2 === 0 ? barA : posB }} />
-                    </div>
+              {variant.counts.map(c => (
+                <div key={c.choice}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{c.choice}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{c.count} ({c.pct}%)</span>
                   </div>
-                )
-              })}
+                  <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${c.pct}%`, background: variant.colorIndex % 2 === 0 ? barA : posB }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -331,6 +346,8 @@ function toEditableVariant(v) {
 function EditExperimentModal({ experiment, onClose, onSave }) {
   const [name, setName] = useState(experiment.name)
   const [variants, setVariants] = useState(experiment.variants.map(toEditableVariant))
+  const [minAppVersion, setMinAppVersion] = useState(experiment.minAppVersion ?? '')
+  const [minAppVersionError, setMinAppVersionError] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -433,6 +450,11 @@ function EditExperimentModal({ experiment, onClose, onSave }) {
     return Object.keys(obj).length ? obj : null
   }
 
+  function validateMinAppVersion(value) {
+    if (!value.trim()) return null
+    return /^\d+(\.\d+)*$/.test(value.trim()) ? null : 'Must be dot-separated numbers, e.g. "2.1.0"'
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
@@ -441,11 +463,14 @@ function EditExperimentModal({ experiment, onClose, onSave }) {
       setError('Choice options cannot be blank')
       return
     }
+    const versionError = validateMinAppVersion(minAppVersion)
+    if (versionError) { setMinAppVersionError(versionError); return }
     setLoading(true)
     try {
       const variantsWithMetadata = variants.map(v => ({ ...v, resolvedMetadata: resolveVariantMetadata(v) }))
       const res = await api.patch(`/experiments/${experiment.id}`, {
         name,
+        minAppVersion: minAppVersion.trim() || null,
         variants: variantsWithMetadata.map(v => ({
           id: v.id,
           name: v.name,
@@ -481,6 +506,20 @@ function EditExperimentModal({ experiment, onClose, onSave }) {
               onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
               onBlur={e => e.target.style.boxShadow = 'none'}
               required />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+              Minimum App Version <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+            </label>
+            <input value={minAppVersion}
+              onChange={e => { setMinAppVersion(e.target.value); setMinAppVersionError(null) }}
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={{ ...inputStyle, boxShadow: 'none' }}
+              onFocus={e => e.target.style.boxShadow = '0 0 0 2px var(--accent)'}
+              onBlur={e => e.target.style.boxShadow = 'none'}
+              placeholder="e.g. 2.1.0 — leave blank for no restriction" />
+            {minAppVersionError && <p className="text-sm mt-1" style={{ color: '#EF4444' }}>{minAppVersionError}</p>}
           </div>
 
           <div>
@@ -628,13 +667,26 @@ export default function ExperimentDetail() {
   const [feedbackSort, setFeedbackSort] = useState({ key: 'createdAt', direction: 'desc' })
   const [variantSort, setVariantSort] = useState({ key: null, direction: 'asc' })
   const [showComments, setShowComments] = useState(true)
+  const [showVariantMetadata, setShowVariantMetadata] = useState(false)
+  const [aggregates, setAggregates] = useState([])
   const [showEditModal, setShowEditModal] = useState(false)
 
   useEffect(() => {
     async function load() {
       try {
-        const expRes = await api.get(`/experiments/${id}/results`)
+        // Aggregate is fetched alongside results rather than derived from the
+        // structured-feedback table's `feedback` state: that state is capped
+        // at 100 rows and can be narrowed by variantFilter, so deriving
+        // thumbs/multiple-choice breakdowns from it undercounts (or entirely
+        // hides) variants whenever there's more feedback than that or a
+        // filter is active. The aggregate endpoint always reflects the whole
+        // experiment, computed server-side, independent of any table filter.
+        const [expRes, aggRes] = await Promise.all([
+          api.get(`/experiments/${id}/results`),
+          api.get(`/experiments/${id}/aggregate`),
+        ])
         setExperiment(expRes.data)
+        setAggregates(aggRes.data.aggregates)
       } catch (err) { console.error(err) }
       finally { setLoading(false) }
     }
@@ -674,10 +726,13 @@ export default function ExperimentDetail() {
     finally { setUpdatingStatus(false) }
   }
 
-  const feedbackTypes = [...new Set(feedback.map(f => f.type))]
-  const hasStarRating = feedbackTypes.includes('STAR_RATING')
-  const hasThumbs = feedbackTypes.includes('THUMBS')
-  const hasMultipleChoice = feedbackTypes.includes('MULTIPLE_CHOICE')
+  // Derived from the server-computed aggregate, not the structured-feedback
+  // table's `feedback` state — that state is capped at 100 rows and can be
+  // narrowed by variantFilter, so gating chart/column visibility on it could
+  // hide a whole section just because the table happens to be filtered.
+  const hasStarRating = aggregates.some(a => a.starRating.count > 0)
+  const hasThumbs = aggregates.some(a => a.thumbs.count > 0)
+  const hasMultipleChoice = aggregates.some(a => a.multipleChoice.count > 0)
 
   function getVariantSummaryLabel() {
     if (hasStarRating) return 'Avg. Rating'
@@ -688,29 +743,33 @@ export default function ExperimentDetail() {
 
   function getVariantSummaryValue(v, result) {
     if (hasStarRating) return result?.avgRating != null ? result.avgRating.toFixed(2) : '—'
+    const agg = aggregates.find(a => a.variantId === v.id)
     if (hasThumbs) {
-      const thumbs = feedback.filter(f => f.variantId === v.id && f.type === 'THUMBS')
-      if (thumbs.length === 0) return '—'
-      return `${Math.round((thumbs.filter(f => f.value === true).length / thumbs.length) * 100)}%`
+      if (!agg || agg.thumbs.count === 0) return '—'
+      return `${agg.thumbs.positivePct}%`
     }
     if (hasMultipleChoice) {
-      const mc = feedback.filter(f => f.variantId === v.id && f.type === 'MULTIPLE_CHOICE')
-      if (mc.length === 0) return '—'
-      const counts = {}
-      mc.forEach(f => { const k = Number(f.value); counts[k] = (counts[k] || 0) + 1 })
-      const leadingEntry = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
-      const leadingIndex = Number(leadingEntry?.[0])
-      const leadingCount = leadingEntry?.[1] ?? 0
-      const leadingPct = mc.length > 0 ? Math.round((leadingCount / mc.length) * 100) : 0
-      const choiceName = v.choices?.[leadingIndex]
-      return choiceName ? `Option ${leadingIndex + 1}: ${choiceName} (${leadingPct}%)` : `Option ${leadingIndex + 1} (${leadingPct}%)`
+      if (!agg || agg.multipleChoice.count === 0) return '—'
+      const leading = [...agg.multipleChoice.choices].sort((x, y) => y.count - x.count)[0]
+      if (!leading) return '—'
+      return `Option ${leading.index + 1}: ${leading.choice} (${leading.pct}%)`
     }
     return '—'
   }
 
   const variantTableData = (experiment?.variants ?? []).map(v => {
     const result = experiment?.results?.find(r => r.variantId === v.id)
-    return { id: v.id, name: v.name, weight: v.weight, responseCount: result?.responseCount ?? 0, summaryValue: getVariantSummaryValue(v, result), choices: v.choices, metadata: v.metadata }
+    return {
+      id: v.id,
+      name: v.name,
+      weight: v.weight,
+      responseCount: result?.responseCount ?? 0,
+      exposureCount: result?.exposureCount ?? 0,
+      responseRatePct: result?.responseRatePct ?? null,
+      summaryValue: getVariantSummaryValue(v, result),
+      choices: v.choices,
+      metadata: v.metadata,
+    }
   })
   const sortedVariants = useSortedData(variantTableData, variantSort)
 
@@ -781,8 +840,12 @@ export default function ExperimentDetail() {
 
       {/* Variants table */}
       <div className="rounded-xl" style={cardStyle}>
-        <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Variants</h3>
+          <button onClick={() => setShowVariantMetadata(prev => !prev)}
+            className="text-sm font-medium" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            {showVariantMetadata ? 'Hide all metadata' : 'Show all metadata'}
+          </button>
         </div>
         <table className="w-full">
           <thead>
@@ -799,14 +862,14 @@ export default function ExperimentDetail() {
             </tr>
           </thead>
           <tbody>
-            {sortedVariants.map((v, i) => <VariantRow key={v.id} v={v} i={i} />)}
+            {sortedVariants.map((v, i) => <VariantRow key={v.id} v={v} i={i} showMetadata={showVariantMetadata} />)}
           </tbody>
         </table>
       </div>
 
       {hasStarRating && <StarRatingChart data={experiment.results ?? []} />}
-      {hasThumbs && <ThumbsChart data={experiment.results ?? []} feedback={feedback} />}
-      {hasMultipleChoice && <MultipleChoiceChart variants={experiment.variants ?? []} feedback={feedback} />}
+      {hasThumbs && <ThumbsChart aggregates={aggregates} />}
+      {hasMultipleChoice && <MultipleChoiceChart aggregates={aggregates} />}
 
       {/* Structured feedback */}
       <div className="rounded-xl" style={cardStyle}>
