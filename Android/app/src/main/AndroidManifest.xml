@@ -15,11 +15,11 @@
 
         <meta-data
             android:name="com.pulsesdk.API_KEY"
-            android:value="7d6defdc-0758-4358-8cec-95485a9917fc" />
+            android:value="659a398d-9b5f-4d32-af06-d25302ad19da" />
 
         <meta-data
             android:name="com.pulsesdk.SERVER_URL"
-            android:value="http://10.0.0.22:3000" />
+            android:value="http://10.0.0.17:3000" />
 
         <activity
             android:name=".MainActivity"

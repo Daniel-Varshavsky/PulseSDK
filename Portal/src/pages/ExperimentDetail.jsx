@@ -139,8 +139,9 @@ function VariantRow({ v, i, showMetadata }) {
           </div>
         </td>
         <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.weight}%</td>
+        <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{v.exposureCount}</td>
         <td className="px-6 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          {v.responseCount} <span style={{ color: 'var(--text-tertiary)' }}>/ {v.exposureCount} shown</span>
+          {v.responseCount}
           {v.responseRatePct != null && (
             <span className="ml-1" style={{ color: 'var(--text-tertiary)' }}>({v.responseRatePct}%)</span>
           )}
@@ -154,7 +155,7 @@ function VariantRow({ v, i, showMetadata }) {
       </tr>
       {expanded && hasMetadata && (
         <tr style={{ background: 'var(--bg-subtle)', borderTop: '1px solid var(--border)' }}>
-          <td colSpan={5} className="px-6 py-3">
+          <td colSpan={6} className="px-6 py-3">
             <div className="rounded-lg px-4 py-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
               <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Metadata</p>
               <div className="space-y-1.5">
@@ -726,13 +727,13 @@ export default function ExperimentDetail() {
     finally { setUpdatingStatus(false) }
   }
 
-  // Derived from the server-computed aggregate, not the structured-feedback
-  // table's `feedback` state — that state is capped at 100 rows and can be
-  // narrowed by variantFilter, so gating chart/column visibility on it could
-  // hide a whole section just because the table happens to be filtered.
-  const hasStarRating = aggregates.some(a => a.starRating.count > 0)
-  const hasThumbs = aggregates.some(a => a.thumbs.count > 0)
-  const hasMultipleChoice = aggregates.some(a => a.multipleChoice.count > 0)
+  // Derived from the experiment's own feedbackType, not from whether any
+  // response has actually come in yet — a freshly-created THUMBS experiment
+  // should still show its chart/column (with a "no responses yet" state),
+  // not disappear until its first response arrives.
+  const hasStarRating = experiment?.feedbackType === 'STAR_RATING'
+  const hasThumbs = experiment?.feedbackType === 'THUMBS'
+  const hasMultipleChoice = experiment?.feedbackType === 'MULTIPLE_CHOICE'
 
   function getVariantSummaryLabel() {
     if (hasStarRating) return 'Avg. Rating'
@@ -850,7 +851,7 @@ export default function ExperimentDetail() {
         <table className="w-full">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide" style={{ color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)' }}>
-              {[{ key: 'name', label: 'Variant' }, { key: 'weight', label: 'Traffic' }, { key: 'responseCount', label: 'Responses' }, { key: 'summaryValue', label: getVariantSummaryLabel() }].map(col => (
+              {[{ key: 'name', label: 'Variant' }, { key: 'weight', label: 'Traffic' }, { key: 'exposureCount', label: 'Users Shown' }, { key: 'responseCount', label: 'Responses' }, { key: 'summaryValue', label: getVariantSummaryLabel() }].map(col => (
                 <th key={col.key} className="px-6 py-3 cursor-pointer select-none"
                   onClick={() => toggleSort(setVariantSort, col.key)}
                   onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}

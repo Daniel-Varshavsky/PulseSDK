@@ -109,10 +109,14 @@ export default function Dashboard() {
         // Two targeted requests instead of one unfiltered list fetched and
         // then sliced/filtered client-side: the server already supports
         // status + limit, so ask it for exactly the 5-active-for-charts and
-        // 5-most-recent-for-the-table sets directly.
+        // 5-most-recent-for-the-table sets directly. prioritizeStatus
+        // selects the table's 5 with ACTIVE preferred over PAUSED preferred
+        // over COMPLETED even if that means an older experiment displaces a
+        // newer one — the returned list is still ordered by recency, just
+        // not selected by recency alone.
         const [activeRes, recentRes, statsRes] = await Promise.all([
           api.get('/experiments?status=ACTIVE&limit=5'),
-          api.get('/experiments?limit=5'),
+          api.get('/experiments?limit=5&prioritizeStatus=true'),
           api.get('/apps/stats'),
         ])
 
@@ -141,41 +145,37 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Build chart data from server-computed aggregates. For experiments with
-  // any star rating data, show every variant (defaulting to 0 for ones with
-  // no ratings yet) — matches ExperimentDetail's chart, which does the same.
-  const starChartData = activeExperiments.flatMap(exp => {
-    const aggs = exp.aggregates ?? []
-    if (!aggs.some(a => a.starRating.count > 0)) return []
-    return aggs.map(a => ({
+  // Build chart data from server-computed aggregates. Gated on the
+  // experiment's own feedbackType, not on whether any response has come in
+  // yet — a freshly-created THUMBS experiment among the active set should
+  // still show its card (with a "no responses yet" state per variant),
+  // not disappear until its first response arrives.
+  const starChartData = activeExperiments
+    .filter(exp => exp.feedbackType === 'STAR_RATING')
+    .flatMap(exp => (exp.aggregates ?? []).map(a => ({
       name: `${exp.name} — ${a.variantName}`,
       avgRating: a.starRating.avgRating != null ? parseFloat(a.starRating.avgRating.toFixed(2)) : 0,
-    }))
-  })
+    })))
 
-  const thumbsChartData = activeExperiments.flatMap(exp => {
-    const aggs = exp.aggregates ?? []
-    if (!aggs.some(a => a.thumbs.count > 0)) return []
-    return aggs.map((a, i) => ({
+  const thumbsChartData = activeExperiments
+    .filter(exp => exp.feedbackType === 'THUMBS')
+    .flatMap(exp => (exp.aggregates ?? []).map((a, i) => ({
       name: `${exp.name} — ${a.variantName}`,
       positive: a.thumbs.positivePct ?? 0,
       negative: a.thumbs.positivePct != null ? 100 - a.thumbs.positivePct : 0,
       total: a.thumbs.count,
       colorIndex: i,
-    }))
-  })
+    })))
 
-  const multipleChoiceChartData = activeExperiments.flatMap(exp => {
-    const aggs = exp.aggregates ?? []
-    if (!aggs.some(a => a.multipleChoice.count > 0)) return []
-    return aggs.map((a, vi) => ({
+  const multipleChoiceChartData = activeExperiments
+    .filter(exp => exp.feedbackType === 'MULTIPLE_CHOICE')
+    .flatMap(exp => (exp.aggregates ?? []).map((a, vi) => ({
       experimentName: exp.name,
       variantName: a.variantName,
       counts: a.multipleChoice.choices,
       total: a.multipleChoice.count,
       colorIndex: vi,
-    }))
-  })
+    })))
 
   const cBarA = () => cssVar('--chart-bar-a')
   const cBarB = () => cssVar('--chart-bar-b')

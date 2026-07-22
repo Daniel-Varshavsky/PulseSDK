@@ -72,6 +72,13 @@ export async function getExperiments(req, res) {
     // version-targeted experiments can be filtered out before the client
     // ever sees them, rather than trusting it to self-exclude.
     appVersion,
+    // Opt-in: used by the Dashboard's "Recent Experiments" table so an
+    // older ACTIVE experiment isn't crowded out of the top N by a newer
+    // PAUSED/COMPLETED one. Selection is status-first, but the returned
+    // list is still ordered purely by recency (see below) — plain list
+    // views (Experiments page, SDK) don't pass this and keep today's
+    // straight recency ordering.
+    prioritizeStatus,
   } = req.query
 
   try {
@@ -94,7 +101,14 @@ export async function getExperiments(req, res) {
       // groupBy + raw SQL aggregate here on every list/SDK fetch, for data
       // nothing consumes, was pure waste.
       include: { variants: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: prioritizeStatus === 'true'
+        // ExperimentStatus was declared ACTIVE, PAUSED, COMPLETED (see the
+        // init migration) — Postgres enums compare by declaration order,
+        // not alphabetically, so this sorts active experiments first
+        // regardless of age, then paused, then completed, newest-first
+        // within each tier.
+        ? [{ status: 'asc' }, { createdAt: 'desc' }]
+        : { createdAt: 'desc' },
       ...(limit && { take: parseInt(limit) }),
       skip: parseInt(offset),
     })
@@ -103,6 +117,13 @@ export async function getExperiments(req, res) {
     // for arbitrary-length dot-separated segments, so it's filtered in JS
     // post-fetch — fine at this scale (one app's experiment list).
     experiments = experiments.filter(e => satisfiesMinVersion(appVersion, e.minAppVersion))
+
+    // The ordering above picked the top N by status tier; the table itself
+    // should still display purely by recency, not grouped by status, so
+    // re-sort just the already-selected set here.
+    if (prioritizeStatus === 'true') {
+      experiments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    }
 
     res.json(experiments)
   } catch (err) {

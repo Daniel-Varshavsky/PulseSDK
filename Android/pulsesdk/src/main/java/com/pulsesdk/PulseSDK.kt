@@ -440,7 +440,7 @@ object PulseSDK {
         Thread.setDefaultUncaughtExceptionHandler(PulseCrashHandler())
     }
 
-    private inner class PulseCrashHandler : Thread.UncaughtExceptionHandler {
+    private class PulseCrashHandler : Thread.UncaughtExceptionHandler {
         override fun uncaughtException(thread: Thread, throwable: Throwable) {
             try {
                 recordCrashBlocking(throwable)

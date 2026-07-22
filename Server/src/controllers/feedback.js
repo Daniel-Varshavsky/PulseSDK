@@ -33,27 +33,32 @@ export async function submitFeedback(req, res) {
       }
     }
 
-    const existing = await prisma.feedbackResponse.findFirst({
-      where: { userId, variantId: variantId ?? null, type },
-    })
-
     let feedback
-    if (existing) {
-      feedback = await prisma.feedbackResponse.update({
-        where: { id: existing.id },
-        data: { value, comment: comment ?? null, screenId: screenId ?? null, appVersion: appVersion ?? null },
+    if (variantId) {
+      // Experiment feedback: one response per (user, variant, type) — a
+      // second submission is a revision of the same rating/answer, not a
+      // separate one, so it overwrites in place.
+      const existing = await prisma.feedbackResponse.findFirst({
+        where: { userId, variantId, type },
       })
+
+      if (existing) {
+        feedback = await prisma.feedbackResponse.update({
+          where: { id: existing.id },
+          data: { value, comment: comment ?? null, screenId: screenId ?? null, appVersion: appVersion ?? null },
+        })
+      } else {
+        feedback = await prisma.feedbackResponse.create({
+          data: { userId, variantId, type, value, comment: comment ?? null, screenId: screenId ?? null, appVersion: appVersion ?? null },
+        })
+      }
     } else {
+      // Standalone feedback (the general "Send Feedback" idea/bug/other
+      // flow, not tied to any experiment variant) is never a revision of a
+      // prior submission — each one is its own independent piece of
+      // feedback, so it's always a new row, never an overwrite.
       feedback = await prisma.feedbackResponse.create({
-        data: {
-          userId,
-          variantId: variantId ?? null,
-          type,
-          value,
-          comment: comment ?? null,
-          screenId: screenId ?? null,
-          appVersion: appVersion ?? null,
-        },
+        data: { userId, variantId: null, type, value, comment: comment ?? null, screenId: screenId ?? null, appVersion: appVersion ?? null },
       })
     }
 

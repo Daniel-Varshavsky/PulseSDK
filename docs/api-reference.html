@@ -133,7 +133,7 @@
       <tr><td><span class="badge post">POST</span><code>/devices/identify</code></td><td>Link a device to an <code>externalUserId</code></td></tr>
       <tr><td><span class="badge post">POST</span><code>/devices/clear</code></td><td>Unlink a device from its user</td></tr>
       <tr><td><span class="badge post">POST</span><code>/devices/refresh-token</code></td><td>Update a device's FCM token</td></tr>
-      <tr><td><span class="badge get">GET</span><code>/experiments</code></td><td>List active experiments with their variants (no results — see <code>/experiments/:id/results</code> or <code>/aggregate</code> for those). Accepts <code>appVersion</code> to filter out version-targeted experiments the device doesn't qualify for</td></tr>
+      <tr><td><span class="badge get">GET</span><code>/experiments</code></td><td>List active experiments with their variants (no results — see <code>/experiments/:id/results</code> or <code>/aggregate</code> for those). Accepts <code>appVersion</code> to filter out version-targeted experiments the device doesn't qualify for, and <code>prioritizeStatus=true</code> (Portal only) to select the top <code>limit</code> preferring ACTIVE over PAUSED over COMPLETED before falling back to recency — the returned list is still ordered by recency, just not selected by recency alone</td></tr>
       <tr><td><span class="badge post">POST</span><code>/feedback</code></td><td>Submit a feedback response</td></tr>
       <tr><td><span class="badge post">POST</span><code>/exposure</code></td><td>Log that a user was shown a variant</td></tr>
       <tr><td><span class="badge post">POST</span><code>/crashes</code></td><td>Submit a write-ahead-logged crash report</td></tr>
